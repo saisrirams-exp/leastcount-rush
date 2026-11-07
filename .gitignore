@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Binaries & executables
+cloudflared.exe
+*.exe
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment & OS
+.env
+.DS_Store
+Thumbs.db

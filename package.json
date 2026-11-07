@@ -1,0 +1,13 @@
+{
+  "name": "leastcount-rush",
+  "version": "1.0.0",
+  "description": "Least Count Rush - Real-time multiplayer card game for 6 to 15 players",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

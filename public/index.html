@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Least Count Rush (6 to 15 Players)</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- Top App Bar -->
+  <header class="app-bar">
+    <div class="brand">
+      <span class="logo-icon">🃏</span>
+      <div>
+        <h1>Least Count <span style="color:#fff;">Rush</span></h1>
+      </div>
+      <span class="subtitle">6–15 Players</span>
+    </div>
+    <div id="roomBadge" class="room-badge" style="display:none;">
+      <span>TABLE:</span>
+      <span id="roomBadgeCode" class="code">------</span>
+      <button id="copyInviteBtn" title="Copy Invite Link" style="background:none; border:none; cursor:pointer; font-size:14px;">📋</button>
+      <button id="adminStopGameBtn" class="header-action-btn btn-admin-stop" style="display:none;" title="End Game for All Players (Admin)">🛑 Stop Game</button>
+      <button id="exitTableBtn" class="header-action-btn btn-exit" style="display:none;" title="Leave Table">🚪 Exit</button>
+    </div>
+  </header>
+
+  <!-- Main Screens Container -->
+  <main id="appContainer" style="flex:1; display:flex; flex-direction:column;">
+
+    <!-- 1. WELCOME / HOME SCREEN -->
+    <section id="homeScreen" class="screen">
+      <div class="lobby-card">
+        <div class="lobby-hero">
+          <div style="font-size: 48px; margin-bottom: 8px;">👑</div>
+          <h2>Least Count Rush</h2>
+          <p>The high-speed lowest-hand card game built for 6 to 15 players with multi-deck scaling.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="playerNameInput">Your Name</label>
+          <input type="text" id="playerNameInput" class="text-input" placeholder="Enter your name" maxlength="15" autocomplete="off">
+        </div>
+
+        <button id="openCreateModalBtn" class="btn-primary" style="margin-bottom:12px;">Create Table (6–15 Players)</button>
+
+        <div class="divider">
+          <span>or join with code</span>
+        </div>
+
+        <div class="form-group">
+          <input type="text" id="joinCodeInput" class="text-input" placeholder="Enter 5-letter Room Code" style="text-transform:uppercase; text-align:center; letter-spacing:2px;">
+        </div>
+        <button id="joinRoomBtn" class="btn-secondary">Join Table</button>
+      </div>
+    </section>
+
+    <!-- 2. WAITING LOBBY SCREEN -->
+    <section id="lobbyScreen" class="screen" style="display:none;">
+      <div class="lobby-card" style="max-width: 650px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <h2 style="font-size:22px; color:var(--gold);">Table <span id="lobbyRoomCode"></span></h2>
+            <p id="lobbyCapacityLabel" style="font-size:13px; color:rgba(253,250,243,0.7);"></p>
+          </div>
+          <button id="copyInviteLinkBtn" class="btn-secondary" style="width:auto; padding:8px 14px; font-size:13px;">🔗 Copy Invite Link</button>
+        </div>
+
+        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:rgba(253,250,243,0.6); margin-bottom:6px;">
+          Players Joined (<span id="playerCountLabel">1</span>/<span id="maxCapacityLabel">10</span>)
+        </div>
+
+        <!-- Player List -->
+        <div id="waitingPlayerList" class="waiting-list"></div>
+
+        <!-- Bot Fill & Host Controls -->
+        <div id="hostLobbyControls" style="display:none; margin-top:16px;">
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <button id="addSingleBotBtn" class="btn-secondary" style="flex:1; padding:10px; font-size:13px;">+ Add 1 Bot</button>
+            <button id="fillBotsBtn" class="btn-secondary" style="flex:1; padding:10px; font-size:13px; border-color:var(--gold); color:var(--gold);">⚡ Fill with Bots to Max</button>
+          </div>
+          <button id="startGameBtn" class="btn-primary">Start Game</button>
+        </div>
+
+        <div id="nonHostLobbyMessage" style="text-align:center; padding:16px; font-size:14px; color:rgba(253,250,243,0.7); display:none;">
+          Waiting for the table host to start the game…
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. IN-GAME TABLE SCREEN -->
+    <section id="gameScreen" class="game-arena" style="display:none;">
+
+      <!-- Top Stadium Bar for 6 to 15 Players -->
+      <div id="arenaStadium" class="arena-stadium">
+        <!-- Injected via JavaScript dynamically -->
+      </div>
+
+      <!-- Center Green Felt Table -->
+      <div class="felt-table">
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+          <div style="font-size:12px; font-weight:700; color:rgba(253,250,243,0.6);">
+            ROUND <span id="roundNumberBadge" style="color:var(--gold); font-size:14px;">1</span>
+            <span id="deckShoeBadge" style="margin-left:8px; font-size:11px; opacity:0.8;"></span>
+          </div>
+          <div id="actionBanner" class="action-banner">Game in progress</div>
+          <div style="font-size:12px; font-weight:700; color:rgba(253,250,243,0.6);">
+            KNOCKOUT: <span id="eliminationScoreBadge" style="color:var(--danger); font-size:14px;">150</span>
+          </div>
+        </div>
+
+        <!-- Central Table Hub: Left (Draw Deck & Wild Joker) | Middle (Dotted Drop Box) | Right (Discard Stack) -->
+        <div class="table-center-hub">
+
+          <!-- LEFT: Draw Deck & Wild Joker -->
+          <div class="table-side-column left-column">
+            <!-- Wild Joker Display -->
+            <div class="pile-container">
+              <span class="pile-label" style="color:var(--gold);">★ Wild Joker</span>
+              <div id="wildJokerSlot" class="card-pile single-card" title="Wild Joker (All cards of this rank are 0 pts)">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- Draw Pile (Cards are drawn from here) -->
+            <div class="pile-container">
+              <span class="pile-label">Draw Deck</span>
+              <div id="drawPileBtn" class="card-pile deck-back interactive-pile" title="Tap to draw a card">
+                <span>🂠</span>
+                <span id="deckCountBadge" class="deck-count">108</span>
+                <div id="drawDeckHint" class="pile-tap-hint">TAP TO DRAW</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MIDDLE: Turn Timer & Dotted Drop Box (Active only on player's chance to drop) -->
+          <div class="table-middle-column">
+            <!-- Turn Timer Dial -->
+            <div class="timer-dial">
+              <div id="timerCircle" class="timer-circle">12</div>
+              <span class="timer-label">Timer</span>
+            </div>
+
+            <!-- The Dotted Box in the Middle -->
+            <div id="middleDottedDropBox" class="middle-drop-box" title="Drop your card(s) here">
+              <div class="drop-box-content">
+                <span class="drop-box-icon">⬇️</span>
+                <span class="drop-box-text">DROP CARDS HERE</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Discard Pile (Where dropped cards are shown) -->
+          <div class="table-side-column right-column">
+            <div class="pile-container">
+              <span class="pile-label">Discard Pile</span>
+              <div id="discardStackPile" class="card-pile interactive-pile" title="Where dropped cards are shown (Tap to draw on your turn)">
+                <div id="discardPileCardWrapper">
+                  <!-- Dropped cards shown here dynamically -->
+                </div>
+                <div id="drawDiscardHint" class="pile-tap-hint">TAP TO TAKE</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div id="turnGuidePrompt" style="font-size:13px; font-weight:700; color:rgba(253,250,243,0.8); text-align:center;">
+          Drag card(s) into the middle dotted box to drop, then tap a pile to draw.
+        </div>
+      </div>
+
+      <!-- Bottom Player Hand Console -->
+      <div class="player-console">
+        <div class="console-header">
+          <div class="score-badge">
+            Hand Total: <span id="myHandPoints" class="pts">0</span> pts
+          </div>
+          <div id="turnStatusBadge" class="turn-status-badge">Waiting…</div>
+          <div class="score-badge">
+            Game Score: <span id="myGameScore" class="pts" style="color:#ef233c;">0</span> / <span id="maxScoreTarget">150</span>
+          </div>
+        </div>
+
+        <!-- Interactive Hand Cards (Drag & Drop enabled) -->
+        <div id="myHandCards" class="hand-cards">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Dynamic Controls (SHOW, SLASH, DROP) -->
+        <div class="controls-row">
+          <!-- SLASH BUTTON: Appears when holding cards matching the open discard rank -->
+          <button id="slashBtn" class="action-btn btn-slash-special" style="display:none;" title="Drop matching card without drawing!">
+            <span>⚡</span> SLASH (<span id="slashRankText"></span>)
+          </button>
+
+          <!-- SHOW BUTTON: Strictly appears ONLY when hand total <= 10 on your turn -->
+          <button id="callShowBtn" class="action-btn btn-show-special" style="display:none;">
+            <span>👑</span> CALL SHOW (<span id="callShowPoints">0</span> pts)
+          </button>
+          
+          <button id="dropCardsBtn" class="action-btn btn-drop" style="display:none;">
+            <span>⬇️</span> Drop Selected Card(s)
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- CREATE TABLE MODAL (With 6 to 15 Player Selector) -->
+  <div id="createTableModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Create Custom Table</h2>
+        <p style="font-size:13px; color:rgba(253,250,243,0.7); margin-top:4px;">Configure room size and rules</p>
+      </div>
+
+      <!-- 6 to 15 Players Slider -->
+      <div class="settings-box">
+        <div class="slider-header">
+          <label style="font-size:14px; font-weight:800;">Max Players</label>
+          <span id="playerSliderValue" class="slider-badge">10 Players</span>
+        </div>
+        <input type="range" id="maxPlayersSlider" class="range-slider" min="6" max="15" value="10" step="1">
+        <div class="slider-ticks">
+          <span>6 (Party)</span>
+          <span>8</span>
+          <span>10</span>
+          <span>12</span>
+          <span>15 (Max Arena)</span>
+        </div>
+        <div id="deckCapacityInfo" class="deck-info-pill">
+          🃏 3 Decks Shoe (162 cards with Jokers)
+        </div>
+      </div>
+
+      <!-- Elimination Score -->
+      <div class="form-group">
+        <label>Elimination Score Threshold</label>
+        <div class="pill-group" id="elimScorePills">
+          <div class="pill-opt" data-val="100">100 pts (Fast)</div>
+          <div class="pill-opt active" data-val="150">150 pts (Standard)</div>
+          <div class="pill-opt" data-val="200">200 pts (Classic)</div>
+        </div>
+      </div>
+
+      <!-- Turn Speed / Timer -->
+      <div class="form-group">
+        <label>Turn Timer Speed</label>
+        <div class="pill-group" id="turnTimerPills">
+          <div class="pill-opt" data-val="8">8s (Blitz Rush)</div>
+          <div class="pill-opt active" data-val="12">12s (Balanced)</div>
+          <div class="pill-opt" data-val="18">18s (Casual)</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:24px;">
+        <button id="cancelCreateModalBtn" class="btn-secondary" style="flex:1;">Cancel</button>
+        <button id="confirmCreateBtn" class="btn-primary" style="flex:1;">Create Table</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROUND OVER / SHOW RESULTS MODAL -->
+  <div id="resultsModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="resultsTitle">Round Results</h2>
+        <p id="resultsSubtitle" style="font-size:14px; margin-top:6px;"></p>
+      </div>
+
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Cards</th>
+            <th>Hand Pts</th>
+            <th>Round</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="resultsTableBody">
+          <!-- Populated dynamically -->
+        </tbody>
+      </table>
+
+      <div id="eliminatedNotice" style="margin:12px 0; color:var(--danger); font-size:13px; text-align:center; font-weight:700;"></div>
+
+      <div id="hostNextRoundContainer" style="display:none; margin-top:20px;">
+        <button id="nextRoundBtn" class="btn-primary">Start Next Round ➔</button>
+      </div>
+      <div id="nonHostNextRoundMessage" style="text-align:center; color:rgba(253,250,243,0.7); font-size:13px; margin-top:16px;">
+        Waiting for host to start next round…
+      </div>
+    </div>
+  </div>
+
+  <script src="sound.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
