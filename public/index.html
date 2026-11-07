@@ -16,17 +16,19 @@
   <header class="app-bar">
     <div class="brand">
       <span class="logo-icon">🃏</span>
-      <div>
-        <h1>Least Count <span style="color:#fff;">Rush</span></h1>
-      </div>
-      <span class="subtitle">6–15 Players</span>
+      <h1 class="brand-title">Least Count <span style="color:#fff;">Rush</span></h1>
+      <span class="subtitle">6–15P</span>
     </div>
     <div id="roomBadge" class="room-badge" style="display:none;">
-      <span>TABLE:</span>
-      <span id="roomBadgeCode" class="code">------</span>
-      <button id="copyInviteBtn" title="Copy Invite Link" style="background:none; border:none; cursor:pointer; font-size:14px;">📋</button>
-      <button id="adminStopGameBtn" class="header-action-btn btn-admin-stop" style="display:none;" title="End Game for All Players (Admin)">🛑 Stop Game</button>
-      <button id="exitTableBtn" class="header-action-btn btn-exit" style="display:none;" title="Leave Table">🚪 Exit</button>
+      <div class="table-tag">
+        <span class="table-tag-label">TABLE</span>
+        <span id="roomBadgeCode" class="table-tag-code">------</span>
+        <button id="copyInviteBtn" class="table-copy-btn" title="Copy Invite Link">📋</button>
+      </div>
+      <div class="header-action-group">
+        <button id="adminStopGameBtn" class="header-action-btn btn-admin-stop" style="display:none;" title="End Game for All (Admin)">🛑 Stop</button>
+        <button id="exitTableBtn" class="header-action-btn btn-exit" style="display:none;" title="Leave Table">🚪 Exit</button>
+      </div>
     </div>
   </header>
 
@@ -77,16 +79,16 @@
 
     <!-- 2. WAITING LOBBY SCREEN -->
     <section id="lobbyScreen" class="screen" style="display:none;">
-      <div class="lobby-card" style="max-width: 650px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <div>
-            <h2 style="font-size:22px; color:var(--gold);">Table <span id="lobbyRoomCode"></span></h2>
-            <p id="lobbyCapacityLabel" style="font-size:13px; color:rgba(253,250,243,0.7);"></p>
+      <div class="lobby-card">
+        <div class="lobby-header-row">
+          <div class="lobby-meta">
+            <h2 class="lobby-title">Table <span id="lobbyRoomCode"></span></h2>
+            <div id="lobbyCapacityLabel" class="lobby-subtitle"></div>
           </div>
-          <button id="copyInviteLinkBtn" class="btn-secondary" style="width:auto; padding:8px 14px; font-size:13px;">🔗 Copy Invite Link</button>
+          <button id="copyInviteLinkBtn" class="btn-copy-invite">🔗 Copy Invite Link</button>
         </div>
 
-        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:rgba(253,250,243,0.6); margin-bottom:6px;">
+        <div class="lobby-players-label">
           Players Joined (<span id="playerCountLabel">1</span>/<span id="maxCapacityLabel">10</span>)
         </div>
 
@@ -95,14 +97,14 @@
 
         <!-- Bot Fill & Host Controls -->
         <div id="hostLobbyControls" style="display:none; margin-top:16px;">
-          <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <div class="lobby-bot-row">
             <button id="addSingleBotBtn" class="btn-secondary" style="flex:1; padding:10px; font-size:13px;">+ Add 1 Bot</button>
-            <button id="fillBotsBtn" class="btn-secondary" style="flex:1; padding:10px; font-size:13px; border-color:var(--gold); color:var(--gold);">⚡ Fill with Bots to Max</button>
+            <button id="fillBotsBtn" class="btn-secondary btn-fill-bots" style="flex:1; padding:10px; font-size:13px;">⚡ Fill with Bots</button>
           </div>
           <button id="startGameBtn" class="btn-primary">Start Game</button>
         </div>
 
-        <div id="nonHostLobbyMessage" style="text-align:center; padding:16px; font-size:14px; color:rgba(253,250,243,0.7); display:none;">
+        <div id="nonHostLobbyMessage" class="non-host-msg" style="display:none;">
           Waiting for the table host to start the game…
         </div>
       </div>
