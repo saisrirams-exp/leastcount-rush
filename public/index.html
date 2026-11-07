@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0d3b2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Least Count Rush (6 to 15 Players)</title>
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
@@ -160,9 +163,12 @@
 
             <!-- The Dotted Box in the Middle -->
             <div id="middleDottedDropBox" class="middle-drop-box" title="Drop your card(s) here">
-              <div class="drop-box-content">
+              <div id="middleDropPlaceholder" class="drop-box-content">
                 <span class="drop-box-icon">⬇️</span>
-                <span class="drop-box-text">DROP CARDS HERE</span>
+                <span class="drop-box-text">DROP HERE</span>
+              </div>
+              <div id="middleStagedCardContainer" style="display:none; width:100%; height:100%; position:relative;">
+                <!-- Staged card rendered here -->
               </div>
             </div>
           </div>
@@ -182,7 +188,7 @@
 
         </div>
 
-        <div id="turnGuidePrompt" style="font-size:13px; font-weight:700; color:rgba(253,250,243,0.8); text-align:center;">
+        <div id="turnGuidePrompt" style="font-size:12px; font-weight:700; color:rgba(253,250,243,0.85); text-align:center;">
           Drag card(s) into the middle dotted box to drop, then tap a pile to draw.
         </div>
       </div>
@@ -191,11 +197,14 @@
       <div class="player-console">
         <div class="console-header">
           <div class="score-badge">
-            Hand Total: <span id="myHandPoints" class="pts">0</span> pts
+            Hand: <span id="myHandPoints" class="pts">0</span> pts
           </div>
+          <button id="sortCardsBtn" class="btn-sort" title="Sort hand in ascending order (Jokers, A, 2-10, J, Q, K)">
+            <span>🔀</span> Sort
+          </button>
           <div id="turnStatusBadge" class="turn-status-badge">Waiting…</div>
           <div class="score-badge">
-            Game Score: <span id="myGameScore" class="pts" style="color:#ef233c;">0</span> / <span id="maxScoreTarget">150</span>
+            Total: <span id="myGameScore" class="pts" style="color:#ef233c;">0</span> / <span id="maxScoreTarget">150</span>
           </div>
         </div>
 
@@ -209,6 +218,11 @@
           <!-- SLASH BUTTON: Appears when holding cards matching the open discard rank -->
           <button id="slashBtn" class="action-btn btn-slash-special" style="display:none;" title="Drop matching card without drawing!">
             <span>⚡</span> SLASH (<span id="slashRankText"></span>)
+          </button>
+
+          <!-- Return Staged Card Button (Fallback if user doesn't tap middle box) -->
+          <button id="returnStagedCardBtn" class="action-btn btn-secondary" style="display:none; padding:8px 14px; font-size:12px;" title="Take staged card back to hand">
+            <span>↩️</span> Change Card
           </button>
 
           <!-- SHOW BUTTON: Strictly appears ONLY when hand total <= 10 on your turn -->

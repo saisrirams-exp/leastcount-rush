@@ -310,17 +310,23 @@ class GameRoom {
     if (!currentPlayer || currentPlayer.id !== playerId) {
       return { success: false, message: 'You can only slash on your turn' };
     }
-    if (this.turnPhase !== 'DROP') {
-      return { success: false, message: 'You have already dropped cards this turn' };
-    }
 
     const topDiscard = this.discardPile[this.discardPile.length - 1];
     if (!topDiscard) {
       return { success: false, message: 'No discard card to slash' };
     }
 
+    const targetRank = topDiscard.rank;
+
+    // Auto-select all cards in hand matching the target rank if none passed
     if (!Array.isArray(cardIds) || cardIds.length === 0) {
-      return { success: false, message: 'Must select matching card(s) to slash' };
+      cardIds = currentPlayer.hand
+        .filter(c => c.rank === targetRank || (c.isWild && topDiscard.isWild))
+        .map(c => c.id);
+    }
+
+    if (cardIds.length === 0) {
+      return { success: false, message: `No card in hand matches the top discard (${targetRank}) to slash` };
     }
 
     const cardsToSlash = [];
@@ -330,7 +336,6 @@ class GameRoom {
       cardsToSlash.push(found);
     }
 
-    const targetRank = topDiscard.rank;
     const allMatch = cardsToSlash.every(c => c.rank === targetRank || (c.isWild && topDiscard.isWild));
     if (!allMatch) {
       return { success: false, message: `To slash, selected card(s) must match the top discard (${targetRank})!` };
@@ -346,7 +351,7 @@ class GameRoom {
       type: 'SLASH',
       playerId,
       playerName: currentPlayer.name,
-      text: `⚡ ${currentPlayer.name} SLASHED the ${targetRank}! Dropped without drawing!`
+      text: `⚡ ${currentPlayer.name} SLASHED the ${targetRank}! Dropped ${cardsToSlash.length} card(s) without drawing!`
     };
 
     // Slash skips DRAW phase completely! Advance turn immediately
@@ -378,6 +383,80 @@ class GameRoom {
   }
 
   /**
+   * Unified Atomic Drop & Draw:
+   * 1. Validates dropped card(s) in player hand.
+   * 2. Draws from source ('DECK' or 'DISCARD'). If 'DISCARD', draws previous player's discard!
+   * 3. Places current player's dropped cards onto discard pile (top for next player!).
+   * 4. Adds drawn card to hand.
+   * 5. Advances turn.
+   */
+  handleDropAndDraw(playerId, dropCardIds, source = 'DECK') {
+    if (this.status !== 'PLAYING') return { success: false, message: 'Game is not active' };
+    const currentPlayer = this.getCurrentPlayer();
+    if (!currentPlayer || currentPlayer.id !== playerId) {
+      return { success: false, message: 'Not your turn' };
+    }
+
+    if (!Array.isArray(dropCardIds) || dropCardIds.length === 0) {
+      return { success: false, message: 'Must drop at least 1 card' };
+    }
+
+    // Find cards in player's hand
+    const cardsToDrop = [];
+    for (const cid of dropCardIds) {
+      const found = currentPlayer.hand.find(c => c.id === cid);
+      if (!found) return { success: false, message: 'Selected card is not in your hand' };
+      cardsToDrop.push(found);
+    }
+
+    // Validate matching ranks if multiple
+    if (!isValidDrop(cardsToDrop)) {
+      return { success: false, message: 'Multiple cards dropped must have the same rank!' };
+    }
+
+    // Pick card from chosen source FIRST (before placing new drops onto discard pile!)
+    let drawnCard = null;
+    if (source === 'DISCARD') {
+      if (this.discardPile.length === 0) {
+        return { success: false, message: 'Discard pile is empty' };
+      }
+      drawnCard = this.discardPile.pop();
+    } else {
+      this.ensureDrawPileHasCards();
+      if (this.drawPile.length === 0) {
+        return { success: false, message: 'Draw deck is empty' };
+      }
+      drawnCard = this.drawPile.pop();
+    }
+
+    if (drawnCard) {
+      applyWildJokerToCard(drawnCard, this.wildJokerRank);
+    }
+
+    // Remove dropped cards from hand
+    currentPlayer.hand = currentPlayer.hand.filter(c => !dropCardIds.includes(c.id));
+
+    // Place dropped cards onto discard pile (available for next player to pick or slash!)
+    cardsToDrop.forEach(c => this.discardPile.push(c));
+
+    // Add drawn card to hand
+    currentPlayer.hand.push(drawnCard);
+    currentPlayer.droppedThisTurn = [];
+
+    const rankText = cardsToDrop.map(c => c.rank).join(', ');
+    this.lastAction = {
+      type: 'PLAY',
+      playerId,
+      playerName: currentPlayer.name,
+      text: `${currentPlayer.name} dropped [${rankText}] and drew from ${source === 'DISCARD' ? 'discard pile' : 'deck'}`
+    };
+
+    // Advance turn to next player!
+    this.advanceTurn();
+    return { success: true, cardsDropped: cardsToDrop, drawnCard };
+  }
+
+  /**
    * Draw a card from either the 'DECK' or the 'DISCARD' pile.
    */
   handleDraw(playerId, source = 'DECK') {
@@ -393,15 +472,17 @@ class GameRoom {
     let drawnCard = null;
 
     if (source === 'DISCARD') {
-      // Must leave at least the cards just dropped or have available card
-      // In Least Count, you cannot pick what you just dropped yourself!
-      const availableCards = this.discardPile.length - (currentPlayer.droppedThisTurn ? currentPlayer.droppedThisTurn.length : 0);
-      if (availableCards <= 0) {
-        return { success: false, message: 'Cannot draw from discard pile right now' };
+      const droppedCount = (currentPlayer.droppedThisTurn ? currentPlayer.droppedThisTurn.length : 0);
+      const droppedCardsTemp = [];
+      for (let i = 0; i < droppedCount; i++) {
+        droppedCardsTemp.push(this.discardPile.pop());
       }
-      
-      // Draw top card from discard
+      if (this.discardPile.length === 0) {
+        while (droppedCardsTemp.length > 0) this.discardPile.push(droppedCardsTemp.pop());
+        return { success: false, message: 'No card on discard pile from previous player' };
+      }
       drawnCard = this.discardPile.pop();
+      while (droppedCardsTemp.length > 0) this.discardPile.push(droppedCardsTemp.pop());
     } else {
       // Draw from face-down deck
       this.ensureDrawPileHasCards();
@@ -604,9 +685,7 @@ class GameRoom {
       const sortedHand = [...player.hand].sort((a, b) => b.points - a.points);
       const cardToDrop = sortedHand[0];
       if (cardToDrop) {
-        this.handleDrop(player.id, [cardToDrop.id]);
-        // Also auto-draw immediately
-        this.handleDraw(player.id, 'DECK');
+        this.handleDropAndDraw(player.id, [cardToDrop.id], 'DECK');
       }
     } else if (this.turnPhase === 'DRAW') {
       this.handleDraw(player.id, 'DECK');

@@ -1096,14 +1096,277 @@ header.app-bar {
   font-weight: 700;
 }
 
-/* Responsive */
-@media (max-width: 640px) {
-  .single-card, .hand-card, .card-pile {
-    width: 62px;
-    height: 92px;
+/* SORT CARDS BUTTON */
+.btn-sort {
+  background: rgba(245, 197, 66, 0.15);
+  color: var(--gold);
+  border: 1.5px solid var(--gold);
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-sort:hover {
+  background: var(--gold);
+  color: #10231c;
+  transform: translateY(-1px);
+  box-shadow: 0 0 10px var(--gold-glow);
+}
+
+.btn-sort:active {
+  transform: scale(0.96);
+}
+
+/* Staged Drop Card Inside Middle Box */
+.middle-drop-box.has-staged {
+  opacity: 1 !important;
+  border-color: #2ec4b6 !important;
+  border-style: solid !important;
+  border-width: 2.5px !important;
+  background: rgba(46, 196, 182, 0.15) !important;
+  box-shadow: 0 0 20px rgba(46, 196, 182, 0.6) !important;
+  cursor: pointer;
+}
+
+.staged-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2ec4b6;
+  color: #072219;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 8px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+  animation: bounce 0.8s infinite alternate;
+}
+
+.staged-return-hint {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+/* Responsive & Mobile-First Optimizations */
+@media (max-width: 768px) {
+  body {
+    overscroll-behavior-y: none;
   }
-  .card-center-suit { font-size: 24px; }
-  .hand-cards { gap: 6px; }
-  .stadium-badge { min-width: 80px; padding: 4px 6px; }
-  .table-center-hub { gap: 16px; }
+
+  .screen {
+    padding: 6px;
+    height: 100dvh;
+    max-height: 100dvh;
+    box-sizing: border-box;
+  }
+
+  #gameScreen {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    gap: 6px;
+    padding: 4px 6px 8px 6px;
+  }
+
+  .app-bar {
+    padding: 4px 10px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .brand h1 {
+    font-size: 16px;
+  }
+
+  .arena-stadium {
+    padding: 4px 2px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .stadium-badge {
+    min-width: 72px;
+    padding: 3px 6px;
+  }
+
+  .stadium-badge .p-name {
+    font-size: 10px;
+    max-width: 65px;
+  }
+
+  .stadium-badge .p-stats {
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  .felt-table {
+    flex: 1;
+    min-height: unset;
+    padding: 8px 6px;
+    border-radius: 20px;
+    border-width: 4px;
+    margin: 2px 0;
+  }
+
+  .table-center-hub {
+    gap: 10px;
+    justify-content: space-evenly;
+  }
+
+  .table-side-column {
+    gap: 8px;
+  }
+
+  .single-card, .card-pile, .middle-drop-box {
+    width: 60px;
+    height: 86px;
+  }
+
+  .middle-drop-box {
+    width: 64px;
+    height: 90px;
+  }
+
+  .card-center-suit {
+    font-size: 24px;
+  }
+
+  .card-corner {
+    font-size: 11px;
+  }
+
+  .card-points-badge {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+
+  .pile-label {
+    font-size: 9px;
+  }
+
+  .timer-circle {
+    width: 42px;
+    height: 42px;
+    font-size: 15px;
+  }
+
+  .timer-label {
+    font-size: 8px;
+  }
+
+  #turnGuidePrompt {
+    font-size: 11px !important;
+    line-height: 1.2;
+    padding: 2px 4px;
+  }
+
+  /* Hand Console on Mobile */
+  .player-console {
+    padding: 8px 10px;
+    gap: 6px;
+    border-radius: 16px;
+    flex-shrink: 0;
+  }
+
+  .console-header {
+    font-size: 11px;
+  }
+
+  .score-badge {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .score-badge span.pts {
+    font-size: 13px;
+  }
+
+  .turn-status-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .hand-cards {
+    gap: 4px;
+    padding: 4px 0;
+    min-height: 94px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hand-card {
+    width: 58px;
+    height: 86px;
+    flex-shrink: 0;
+  }
+
+  .hand-card.selected {
+    transform: translateY(-12px) scale(1.04);
+  }
+
+  .controls-row {
+    gap: 6px;
+  }
+
+  .action-btn {
+    padding: 10px 16px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+
+  .btn-show-special {
+    font-size: 13px;
+    padding: 10px 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .single-card, .card-pile {
+    width: 54px;
+    height: 78px;
+  }
+
+  .middle-drop-box {
+    width: 56px;
+    height: 82px;
+  }
+
+  .hand-card {
+    width: 52px;
+    height: 78px;
+  }
+
+  .card-center-suit {
+    font-size: 20px;
+  }
+
+  .table-center-hub {
+    gap: 6px;
+  }
+
+  .table-side-column {
+    gap: 6px;
+  }
 }

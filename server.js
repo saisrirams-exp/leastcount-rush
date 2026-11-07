@@ -230,6 +230,21 @@ io.on('connection', (socket) => {
     }
   });
 
+  // UNIFIED DROP & DRAW (Player stages card in middle, then picks from deck or discard)
+  socket.on('dropAndDraw', ({ dropCardIds, source }) => {
+    const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id) || socket.id;
+    const room = rooms.get(code);
+    if (!room) return;
+
+    const res = room.handleDropAndDraw(pId, dropCardIds, source);
+    if (!res.success) {
+      return socket.emit('actionError', res.message);
+    }
+
+    broadcastRoomState(room);
+  });
+
   // DROP CARDS
   socket.on('dropCards', ({ cardIds }) => {
     const code = playerRoomMap.get(socket.id);

@@ -75,6 +75,10 @@ const eliminationScoreBadge = document.getElementById('eliminationScoreBadge');
 const wildJokerSlot = document.getElementById('wildJokerSlot');
 const drawPileBtn = document.getElementById('drawPileBtn');
 const middleDottedDropBox = document.getElementById('middleDottedDropBox');
+const middleDropPlaceholder = document.getElementById('middleDropPlaceholder');
+const middleStagedCardContainer = document.getElementById('middleStagedCardContainer');
+const returnStagedCardBtn = document.getElementById('returnStagedCardBtn');
+const sortCardsBtn = document.getElementById('sortCardsBtn');
 const discardStackPile = document.getElementById('discardStackPile');
 const discardPileCardWrapper = document.getElementById('discardPileCardWrapper');
 const deckCountBadge = document.getElementById('deckCountBadge');
@@ -92,6 +96,9 @@ const callShowBtn = document.getElementById('callShowBtn');
 const callShowPoints = document.getElementById('callShowPoints');
 const slashBtn = document.getElementById('slashBtn');
 const slashRankText = document.getElementById('slashRankText');
+
+// Staged drop cards in the middle box (pending draw to commit)
+let stagedCards = [];
 
 // Results Modal Elements
 const resultsTitle = document.getElementById('resultsTitle');
@@ -329,31 +336,74 @@ function toggleCardSelection(cardId) {
   updateActionUI();
 }
 
-function executeDrop(cardIdsToDrop) {
+// -----------------------------------------------------------------------------
+// STAGE CARDS IN MIDDLE DOTTED BOX (CAN CHANGE / REVERT FREELY BEFORE DRAWING)
+// -----------------------------------------------------------------------------
+function stageCardsInMiddle(cardIdsToStage) {
   if (!gameState) return;
   const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
-  if (!isMyTurn || gameState.turnPhase !== 'DROP') {
+  if (!isMyTurn || gameState.turnPhase !== 'DROP') return;
+
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+  if (!myPlayer) return;
+
+  const cards = [];
+  for (const cid of cardIdsToStage) {
+    const found = myPlayer.hand.find(c => c.id === cid);
+    if (found) cards.push(found);
+  }
+  if (cards.length === 0) return;
+
+  // Validate rank matching
+  const firstRank = cards[0].rank;
+  const firstIsWild = cards[0].isWild;
+  const allMatch = cards.every(c => c.rank === firstRank || (c.isWild && firstIsWild));
+  if (!allMatch) {
+    alert('Multiple cards dropped must have the same rank!');
     return;
   }
 
-  socket.emit('dropCards', { cardIds: cardIdsToDrop });
+  stagedCards = cards;
   selectedCards.clear();
   window.soundFx.playCardDrop();
+
+  updateHandUI();
+  updateActionUI();
 }
 
-// Fallback click on drop button
-dropCardsBtn.addEventListener('click', () => {
-  if (selectedCards.size > 0) {
-    executeDrop(Array.from(selectedCards));
-  }
-});
+function unstageCards() {
+  if (stagedCards.length === 0) return;
+  stagedCards = [];
+  selectedCards.clear();
+  window.soundFx.playCardDraw();
 
-// Click on middle dotted box when you have selected cards to drop
+  updateHandUI();
+  updateActionUI();
+}
+
+// Click on middle dotted box:
+// - If already staged: returns card to hand so player can change mind!
+// - If not staged: drops selected cards into middle box
 middleDottedDropBox.addEventListener('click', () => {
   if (!gameState) return;
   const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
-  if (isMyTurn && gameState.turnPhase === 'DROP' && selectedCards.size > 0) {
-    executeDrop(Array.from(selectedCards));
+  if (!isMyTurn || gameState.turnPhase !== 'DROP') return;
+
+  if (stagedCards.length > 0) {
+    unstageCards();
+  } else if (selectedCards.size > 0) {
+    stageCardsInMiddle(Array.from(selectedCards));
+  }
+});
+
+if (returnStagedCardBtn) {
+  returnStagedCardBtn.addEventListener('click', unstageCards);
+}
+
+// Fallback click on drop button in controls
+dropCardsBtn.addEventListener('click', () => {
+  if (selectedCards.size > 0) {
+    stageCardsInMiddle(Array.from(selectedCards));
   }
 });
 
@@ -380,9 +430,9 @@ middleDottedDropBox.addEventListener('drop', (e) => {
   const cardId = e.dataTransfer.getData('text/plain');
   if (cardId) {
     if (selectedCards.has(cardId) && selectedCards.size > 1) {
-      executeDrop(Array.from(selectedCards));
+      stageCardsInMiddle(Array.from(selectedCards));
     } else {
-      executeDrop([cardId]);
+      stageCardsInMiddle([cardId]);
     }
   }
 });
@@ -393,42 +443,115 @@ middleDottedDropBox.addEventListener('drop', (e) => {
 drawPileBtn.addEventListener('click', () => {
   if (!gameState) return;
   const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
-  if (isMyTurn && gameState.turnPhase === 'DRAW') {
+  if (!isMyTurn) return;
+
+  // Staged drop ready -> Commit atomic drop & draw from DECK!
+  if (stagedCards.length > 0) {
+    const dropIds = stagedCards.map(c => c.id);
+    stagedCards = [];
+    socket.emit('dropAndDraw', { dropCardIds: dropIds, source: 'DECK' });
+    window.soundFx.playCardDraw();
+  } else if (gameState.turnPhase === 'DRAW') {
     socket.emit('drawCard', { source: 'DECK' });
     window.soundFx.playCardDraw();
+  } else {
+    alert('👉 Place your card(s) into the Middle Box first before drawing!');
   }
 });
 
 discardStackPile.addEventListener('click', () => {
   if (!gameState) return;
   const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
-  // If DRAW phase, tap on the right discard stack picks it!
-  if (isMyTurn && gameState.turnPhase === 'DRAW') {
+  if (!isMyTurn) return;
+
+  // Staged drop ready -> Commit atomic drop & pick PREVIOUS discard!
+  if (stagedCards.length > 0) {
+    const dropIds = stagedCards.map(c => c.id);
+    stagedCards = [];
+    socket.emit('dropAndDraw', { dropCardIds: dropIds, source: 'DISCARD' });
+    window.soundFx.playCardDraw();
+  } else if (gameState.turnPhase === 'DRAW') {
     socket.emit('drawCard', { source: 'DISCARD' });
     window.soundFx.playCardDraw();
+  } else {
+    // Check if player has matching card to slash
+    const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+    const topDiscard = gameState.topDiscard;
+    if (myPlayer && topDiscard) {
+      const hasMatch = myPlayer.hand.some(c => c.rank === topDiscard.rank || (c.isWild && topDiscard.isWild));
+      if (hasMatch) {
+        executeSlash();
+        return;
+      }
+    }
+    alert('👉 Place your card(s) into the Middle Box first before drawing!');
   }
 });
 
 // -----------------------------------------------------------------------------
 // SLASH (MATCH & DROP): DROPS MATCHING CARD WITHOUT DRAWING!
 // -----------------------------------------------------------------------------
-slashBtn.addEventListener('click', () => {
+function executeSlash() {
   if (!gameState || !gameState.topDiscard) return;
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
   if (!myPlayer) return;
 
   const targetRank = gameState.topDiscard.rank;
   const matchingCards = myPlayer.hand.filter(c => c.rank === targetRank || (c.isWild && gameState.topDiscard.isWild));
-  if (matchingCards.length === 0) return;
-
-  const confirmMsg = `⚡ SLASH the ${targetRank}!\n\nThis will drop your matching card(s) and skip drawing, shrinking your hand. Proceed?`;
-  if (confirm(confirmMsg)) {
-    const cardIds = matchingCards.map(c => c.id);
-    socket.emit('slashCards', { cardIds });
-    selectedCards.clear();
-    window.soundFx.playSlash();
+  if (matchingCards.length === 0) {
+    alert(`No card in your hand matches the top discard (${targetRank}) to slash.`);
+    return;
   }
-});
+
+  const cardIds = matchingCards.map(c => c.id);
+  stagedCards = [];
+  selectedCards.clear();
+  socket.emit('slashCards', { cardIds });
+  window.soundFx.playSlash();
+}
+
+slashBtn.addEventListener('click', executeSlash);
+
+// -----------------------------------------------------------------------------
+// AUTO-SORT HAND (ASCENDING ORDER)
+// -----------------------------------------------------------------------------
+function sortMyHand(ascending = true) {
+  if (!gameState) return;
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+  if (!myPlayer || !myPlayer.hand) return;
+
+  const suitOrder = { '♣': 1, '♦': 2, '♥': 3, '♠': 4, '?': 5 };
+  const getRankVal = (r) => {
+    if (r === 'JOKER') return 0;
+    if (r === 'A') return 1;
+    if (r === 'J') return 11;
+    if (r === 'Q') return 12;
+    if (r === 'K') return 13;
+    return parseInt(r, 10) || 0;
+  };
+
+  myPlayer.hand.sort((a, b) => {
+    // 1. Points (Jokers/Wild = 0 first, Aces = 1, ..., Kings = 13)
+    if (a.points !== b.points) {
+      return ascending ? a.points - b.points : b.points - a.points;
+    }
+    // 2. Rank numerical order
+    const rvA = getRankVal(a.rank);
+    const rvB = getRankVal(b.rank);
+    if (rvA !== rvB) {
+      return ascending ? rvA - rvB : rvB - rvA;
+    }
+    // 3. Group by suit
+    return (suitOrder[a.suit] || 0) - (suitOrder[b.suit] || 0);
+  });
+
+  window.soundFx.playCardDraw();
+  updateHandUI();
+}
+
+if (sortCardsBtn) {
+  sortCardsBtn.addEventListener('click', () => sortMyHand(true));
+}
 
 // -----------------------------------------------------------------------------
 // CALL SHOW: ONLY APPEARS WHEN HAND SCORE IS 10 OR BELOW
@@ -645,69 +768,9 @@ function renderGameTable(state) {
   }
 }
 
-function updateHandUI() {
-  if (!gameState) return;
-  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
-  if (!myPlayer) return;
-
-  if (myPlayer.waitingNextRound) {
-    myHandCards.innerHTML = `
-      <div style="grid-column: 1 / -1; padding: 22px; text-align: center; background: rgba(0,0,0,0.35); border-radius: 14px; border: 1.5px dashed rgba(245,197,66,0.4); margin: 6px auto; max-width: 500px;">
-        <div style="font-size: 18px; font-weight: bold; color: var(--gold); margin-bottom: 6px;">⏳ Spectating Round ${gameState.roundNumber}</div>
-        <div style="color: rgba(253,250,243,0.85); font-size: 13px;">You joined while this round was in progress! You will be dealt cards automatically as soon as Round ${gameState.roundNumber + 1} begins.</div>
-      </div>
-    `;
-    return;
-  }
-
-  const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
-  const isDropPhase = isMyTurn && gameState.turnPhase === 'DROP';
-
-  myHandCards.innerHTML = '';
-  myPlayer.hand.forEach(card => {
-    const isSelected = selectedCards.has(card.id);
-    const cardEl = document.createElement('div');
-    cardEl.className = `hand-card single-card ${card.color} ${isSelected ? 'selected' : ''} ${card.isWild ? 'wild-joker-card' : ''}`;
-    cardEl.innerHTML = createCardInner(card, false);
-
-    // Click to select
-    cardEl.addEventListener('click', () => toggleCardSelection(card.id));
-
-    // Enable HTML5 Drag & Drop on your turn
-    if (isDropPhase) {
-      cardEl.setAttribute('draggable', 'true');
-      cardEl.addEventListener('dragstart', (e) => {
-        cardEl.classList.add('dragging');
-        e.dataTransfer.setData('text/plain', card.id);
-      });
-
-      cardEl.addEventListener('dragend', () => {
-        cardEl.classList.remove('dragging');
-        middleDottedDropBox.classList.remove('drag-over');
-      });
-
-      // Mobile Touch Drag Support
-      cardEl.addEventListener('touchstart', (e) => {
-        touchDraggedCardId = card.id;
-      }, { passive: true });
-
-      cardEl.addEventListener('touchend', (e) => {
-        if (!touchDraggedCardId) return;
-        const touch = e.changedTouches[0];
-        const elemUnder = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (elemUnder && (elemUnder === middleDottedDropBox || middleDottedDropBox.contains(elemUnder))) {
-          if (selectedCards.has(touchDraggedCardId) && selectedCards.size > 1) {
-            executeDrop(Array.from(selectedCards));
-          } else {
-            executeDrop([touchDraggedCardId]);
-          }
-        }
-        touchDraggedCardId = null;
-      });
-    }
-
-    myHandCards.appendChild(cardEl);
-  });
+function calculateHandScore(cards) {
+  if (!cards || cards.length === 0) return 0;
+  return cards.reduce((sum, c) => sum + (c.isWild || c.isJoker ? 0 : (c.points || 0)), 0);
 }
 
 function createCardHTML(card, isSelected) {
@@ -743,6 +806,118 @@ function createCardInner(card, isTableJoker = false) {
   `;
 }
 
+function renderMiddleDropBox(isMyTurn, turnPhase) {
+  if (stagedCards.length > 0) {
+    middleDropPlaceholder.style.display = 'none';
+    middleStagedCardContainer.style.display = 'flex';
+    middleStagedCardContainer.style.flexDirection = 'column';
+    middleStagedCardContainer.style.alignItems = 'center';
+    middleStagedCardContainer.style.justifyContent = 'center';
+    middleDottedDropBox.className = 'middle-drop-box has-staged';
+
+    const card = stagedCards[0];
+    const multiCount = stagedCards.length > 1 ? ` (${stagedCards.length}x)` : '';
+    middleStagedCardContainer.innerHTML = `
+      <div class="staged-badge">READY TO DROP${multiCount}</div>
+      <div class="single-card ${card.color} ${card.isWild ? 'wild-joker-card' : ''}" style="width:100%; height:100%; pointer-events:none; margin:0; box-shadow:none;">
+        ${createCardInner(card, false)}
+      </div>
+      <div class="staged-return-hint">↩️ Tap to change</div>
+    `;
+    if (returnStagedCardBtn) returnStagedCardBtn.style.display = 'inline-flex';
+  } else {
+    middleDropPlaceholder.style.display = 'flex';
+    middleStagedCardContainer.style.display = 'none';
+    middleStagedCardContainer.innerHTML = '';
+    if (returnStagedCardBtn) returnStagedCardBtn.style.display = 'none';
+
+    if (isMyTurn && turnPhase === 'DROP') {
+      middleDottedDropBox.className = 'middle-drop-box active-drop';
+    } else {
+      middleDottedDropBox.className = 'middle-drop-box';
+    }
+  }
+}
+
+function updateHandUI() {
+  if (!gameState) return;
+  const myPlayer = gameState.players.find(p => p.id === myPlayerId);
+  if (!myPlayer) return;
+
+  if (myPlayer.waitingNextRound) {
+    myHandCards.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 18px; text-align: center; background: rgba(0,0,0,0.35); border-radius: 14px; border: 1.5px dashed rgba(245,197,66,0.4); margin: 6px auto; max-width: 500px;">
+        <div style="font-size: 16px; font-weight: bold; color: var(--gold); margin-bottom: 4px;">⏳ Spectating Round ${gameState.roundNumber}</div>
+        <div style="color: rgba(253,250,243,0.85); font-size: 12px;">You will be dealt 5 cards automatically as soon as Round ${gameState.roundNumber + 1} begins!</div>
+      </div>
+    `;
+    return;
+  }
+
+  const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
+  const isDropPhase = isMyTurn && gameState.turnPhase === 'DROP';
+
+  // If a card is currently staged in the middle box, filter it out from hand display
+  const visibleHand = myPlayer.hand.filter(c => !stagedCards.some(sc => sc.id === c.id));
+  myHandPoints.innerText = stagedCards.length > 0 ? calculateHandScore(visibleHand) : (myPlayer.handScore !== null ? myPlayer.handScore : '--');
+
+  myHandCards.innerHTML = '';
+  visibleHand.forEach(card => {
+    const isSelected = selectedCards.has(card.id);
+    const cardEl = document.createElement('div');
+    cardEl.className = `hand-card single-card ${card.color} ${isSelected ? 'selected' : ''} ${card.isWild ? 'wild-joker-card' : ''}`;
+    cardEl.innerHTML = createCardInner(card, false);
+
+    // Tap / Click to select or double-tap to stage
+    cardEl.addEventListener('click', () => toggleCardSelection(card.id));
+
+    // Enable HTML5 Drag & Drop on your turn
+    if (isDropPhase) {
+      cardEl.setAttribute('draggable', 'true');
+      cardEl.addEventListener('dragstart', (e) => {
+        cardEl.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', card.id);
+      });
+
+      cardEl.addEventListener('dragend', () => {
+        cardEl.classList.remove('dragging');
+        middleDottedDropBox.classList.remove('drag-over');
+      });
+
+      // Mobile Touch Drag Support
+      cardEl.addEventListener('touchstart', (e) => {
+        touchDraggedCardId = card.id;
+      }, { passive: true });
+
+      cardEl.addEventListener('touchend', (e) => {
+        if (!touchDraggedCardId) return;
+        const touch = e.changedTouches[0];
+        const elemUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+
+        // Dragged into middle dotted box: stage card!
+        if (elemUnder && (elemUnder === middleDottedDropBox || middleDottedDropBox.contains(elemUnder))) {
+          if (selectedCards.has(touchDraggedCardId) && selectedCards.size > 1) {
+            stageCardsInMiddle(Array.from(selectedCards));
+          } else {
+            stageCardsInMiddle([touchDraggedCardId]);
+          }
+        }
+        // Dragged onto discard pile: if matches top discard rank, auto-slash!
+        else if (elemUnder && (elemUnder === discardStackPile || discardStackPile.contains(elemUnder))) {
+          const topDiscard = gameState?.topDiscard;
+          const draggedCard = myPlayer.hand.find(c => c.id === touchDraggedCardId);
+          if (topDiscard && draggedCard && (draggedCard.rank === topDiscard.rank || (draggedCard.isWild && topDiscard.isWild))) {
+            executeSlash();
+          }
+        }
+        touchDraggedCardId = null;
+      });
+    }
+
+    myHandCards.appendChild(cardEl);
+  });
+}
+
 function updateActionUI() {
   if (!gameState) return;
   const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
@@ -752,13 +927,17 @@ function updateActionUI() {
   // Reset interactive pile classes
   drawPileBtn.classList.remove('can-draw');
   discardStackPile.classList.remove('can-draw');
-  middleDottedDropBox.classList.remove('active-drop');
+
+  renderMiddleDropBox(isMyTurn, turnPhase);
 
   if (!isMyTurn || myPlayer?.eliminated || myPlayer?.waitingNextRound) {
+    stagedCards = [];
+    renderMiddleDropBox(false, turnPhase);
+
     turnStatusBadge.className = 'turn-status-badge';
     if (myPlayer?.waitingNextRound) {
       turnStatusBadge.innerText = 'Spectating this round 👁️';
-      turnGuidePrompt.innerText = `Round ${gameState.roundNumber} is in progress. You'll be dealt cards when Round ${gameState.roundNumber + 1} begins!`;
+      turnGuidePrompt.innerText = `Round ${gameState.roundNumber} in progress. You'll be dealt cards when Round ${gameState.roundNumber + 1} begins!`;
     } else {
       turnStatusBadge.innerText = myPlayer?.eliminated ? 'Eliminated 💀' : `Waiting for ${gameState.currentTurnPlayerName}…`;
       turnGuidePrompt.innerText = `It is currently ${gameState.currentTurnPlayerName}'s turn. Cards appear on the right discard stack as they play.`;
@@ -773,14 +952,26 @@ function updateActionUI() {
   // IT IS MY TURN!
   turnStatusBadge.className = 'turn-status-badge my-turn';
 
+  // 1. If card is staged in middle box: pick a card from LEFT deck or RIGHT discard to finish turn!
+  if (stagedCards.length > 0) {
+    turnStatusBadge.innerText = 'YOUR TURN: Pick a Card';
+    turnGuidePrompt.innerText = 'Card in middle! Tap LEFT Draw Deck or RIGHT Discard Pile to pick and finish turn.';
+
+    drawPileBtn.classList.add('can-draw');
+    discardStackPile.classList.add('can-draw');
+
+    callShowBtn.style.display = 'none';
+    slashBtn.style.display = 'none';
+    dropCardsBtn.style.display = 'none';
+    return;
+  }
+
+  // 2. DROP Phase: player needs to drag/stage a card into the middle box
   if (turnPhase === 'DROP') {
     turnStatusBadge.innerText = 'YOUR TURN: Drop Card(s)';
-    turnGuidePrompt.innerText = 'Drag card(s) into the MIDDLE DOTTED BOX to discard them onto the right stack.';
+    turnGuidePrompt.innerText = 'Drag card(s) into the MIDDLE DOTTED BOX to prepare your drop (or tap card and drop).';
 
-    // MIDDLE DOTTED BOX ACTIVATES ONLY ON YOUR CHANCE TO DROP!
-    middleDottedDropBox.classList.add('active-drop');
-
-    // 1. SHOW BUTTON: Strictly appears ONLY when hand score <= 10 before dropping!
+    // SHOW BUTTON: Strictly appears ONLY when hand score <= 10 before dropping!
     if (myPlayer.handScore !== null && myPlayer.handScore <= 10) {
       callShowBtn.style.display = 'inline-flex';
       callShowPoints.innerText = myPlayer.handScore;
@@ -788,7 +979,7 @@ function updateActionUI() {
       callShowBtn.style.display = 'none';
     }
 
-    // 2. SLASH OPTION (Match & Drop): If holding a card matching top discard rank!
+    // SLASH OPTION (Match & Drop): If holding a card matching top discard rank!
     if (gameState.topDiscard) {
       const targetRank = gameState.topDiscard.rank;
       const hasMatch = myPlayer.hand.some(c => c.rank === targetRank || (c.isWild && gameState.topDiscard.isWild));
@@ -802,10 +993,10 @@ function updateActionUI() {
       slashBtn.style.display = 'none';
     }
 
-    // 3. Fallback button if user selected cards
+    // Fallback button if user selected cards
     if (selectedCards.size > 0) {
       dropCardsBtn.style.display = 'inline-flex';
-      dropCardsBtn.innerText = `Drop ${selectedCards.size} Selected`;
+      dropCardsBtn.innerText = `Place ${selectedCards.size} in Middle`;
     } else {
       dropCardsBtn.style.display = 'none';
     }
@@ -813,7 +1004,6 @@ function updateActionUI() {
     turnStatusBadge.innerText = 'YOUR TURN: Pick a Card';
     turnGuidePrompt.innerText = 'Drop complete! Tap the LEFT Draw Deck or the RIGHT Discard Stack to pick a card.';
 
-    // Piles pulse with golden halo to invite direct tap
     drawPileBtn.classList.add('can-draw');
     discardStackPile.classList.add('can-draw');
 
