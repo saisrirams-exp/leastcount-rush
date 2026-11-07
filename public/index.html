@@ -146,123 +146,99 @@
         <!-- Injected via JavaScript dynamically -->
       </div>
 
-      <!-- Center Green Felt Table -->
+      <!-- Center Luxury Felt Table -->
       <div class="felt-table">
-        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-          <div style="font-size:12px; font-weight:700; color:rgba(253,250,243,0.6);">
-            ROUND <span id="roundNumberBadge" style="color:var(--gold); font-size:14px;">1</span>
-            <span id="deckShoeBadge" style="margin-left:8px; font-size:11px; opacity:0.8;"></span>
+        <div class="table-header-info">
+          <div class="info-pill round-pill">
+            ROUND <span id="roundNumberBadge" class="gold-text">1</span>
+            <span id="deckShoeBadge" class="shoe-text"></span>
           </div>
           <div id="actionBanner" class="action-banner">Game in progress</div>
-          <div style="font-size:12px; font-weight:700; color:rgba(253,250,243,0.6);">
-            KNOCKOUT: <span id="eliminationScoreBadge" style="color:var(--danger); font-size:14px;">150</span>
+          <div class="info-pill knockout-pill">
+            KNOCKOUT: <span id="eliminationScoreBadge" class="danger-text">150</span>
           </div>
         </div>
 
-        <!-- Central Table Hub: Left (Draw Deck & Wild Joker) | Middle (Dotted Drop Box) | Right (Discard Stack) -->
+        <!-- Central Table Hub: Left (Draw Deck & Wild Joker) | Middle (Dashed Drop Box) | Right (Discard Stack) -->
         <div class="table-center-hub">
 
-          <!-- LEFT: Draw Deck & Wild Joker -->
+          <!-- LEFT: Closed Draw Deck with Offset Wild Joker Peeking Underneath -->
           <div class="table-side-column left-column">
-            <!-- Wild Joker Display -->
-            <div class="pile-container">
-              <span class="pile-label" style="color:var(--gold);">★ Wild Joker</span>
-              <div id="wildJokerSlot" class="card-pile single-card" title="Wild Joker (All cards of this rank are 0 pts)">
+            <div class="deck-wild-stack">
+              <!-- Wild Joker Cut Card (tucked underneath, rotated) -->
+              <div id="wildJokerSlot" class="under-deck-wild-card" title="Wild Joker (All cards of this rank are 0 pts)">
                 <!-- Rendered dynamically -->
               </div>
-            </div>
-
-            <!-- Draw Pile (Cards are drawn from here) -->
-            <div class="pile-container">
-              <span class="pile-label">Draw Deck</span>
-              <div id="drawPileBtn" class="card-pile deck-back interactive-pile" title="Tap to draw a card">
-                <span>🂠</span>
+              <!-- Closed Draw Deck on top -->
+              <div id="drawPileBtn" class="card-pile deck-back interactive-pile" title="Draw Deck (Tap to draw card)">
+                <span class="deck-icon">🂠</span>
                 <span id="deckCountBadge" class="deck-count">108</span>
-                <div id="drawDeckHint" class="pile-tap-hint">TAP TO DRAW</div>
               </div>
             </div>
+            <div id="wildJokerMiniLabel" class="wild-mini-badge">★ Wild Joker</div>
           </div>
 
-          <!-- MIDDLE: Turn Timer & Dotted Drop Box (Active only on player's chance to drop) -->
+          <!-- MIDDLE: Turn Timer & Dashed Drop Box -->
           <div class="table-middle-column">
-            <!-- Turn Timer Dial -->
             <div class="timer-dial">
               <div id="timerCircle" class="timer-circle">12</div>
-              <span class="timer-label">Timer</span>
             </div>
 
-            <!-- The Dotted Box in the Middle -->
+            <!-- The Dashed Drop Box in the Middle -->
             <div id="middleDottedDropBox" class="middle-drop-box" title="Drop your card(s) here">
               <div id="middleDropPlaceholder" class="drop-box-content">
                 <span class="drop-box-icon">⬇️</span>
                 <span class="drop-box-text">DROP HERE</span>
               </div>
-              <div id="middleStagedCardContainer" style="display:none; width:100%; height:100%; position:relative;">
-                <!-- Staged card rendered here -->
+              <div id="middleStagedCardContainer" class="staged-cards-wrapper" style="display:none;">
+                <!-- Staged cards fan out horizontally here -->
               </div>
             </div>
           </div>
 
           <!-- RIGHT: Discard Pile (Where dropped cards are shown) -->
           <div class="table-side-column right-column">
-            <div class="pile-container">
-              <span class="pile-label">Discard Pile</span>
-              <div id="discardStackPile" class="card-pile interactive-pile" title="Where dropped cards are shown (Tap to draw on your turn)">
-                <div id="discardPileCardWrapper">
-                  <!-- Dropped cards shown here dynamically -->
-                </div>
-                <div id="drawDiscardHint" class="pile-tap-hint">TAP TO TAKE</div>
+            <div id="discardStackPile" class="card-pile interactive-pile" title="Discard pile (Tap to draw or slash)">
+              <div id="discardPileCardWrapper">
+                <!-- Dropped cards shown here dynamically -->
               </div>
             </div>
+            <div class="discard-mini-badge">Discard Stack</div>
           </div>
 
         </div>
 
-        <div id="turnGuidePrompt" style="font-size:12px; font-weight:700; color:rgba(253,250,243,0.85); text-align:center;">
-          Drag card(s) into the middle dotted box to drop, then tap a pile to draw.
+        <div id="turnStatusNotice" class="turn-status-notice">
+          <span id="turnStatusBadge" class="turn-status-badge">Waiting…</span>
         </div>
       </div>
 
-      <!-- Bottom Player Hand Console -->
-      <div class="player-console">
-        <div class="console-header">
-          <div class="score-badge">
-            Hand: <span id="myHandPoints" class="pts">0</span> pts
+      <!-- Bottom Player Bar (Avatar + Count + Sort | Hand Cards | Unified Show/Slash Action) -->
+      <div class="game-bottom-bar">
+        <!-- Player Info HUD (Left) -->
+        <div class="player-hud-left">
+          <div class="player-hud-avatar-wrap">
+            <div id="myPlayerAvatar" class="hud-avatar">👑</div>
+            <span class="hud-name">You</span>
           </div>
-          <button id="sortCardsBtn" class="btn-sort" title="Sort hand in ascending order (Jokers, A, 2-10, J, Q, K)">
-            <span>🔀</span> Sort
-          </button>
-          <div id="turnStatusBadge" class="turn-status-badge">Waiting…</div>
-          <div class="score-badge">
-            Total: <span id="myGameScore" class="pts" style="color:#ef233c;">0</span> / <span id="maxScoreTarget">150</span>
+          <div class="hud-info-col">
+            <div class="hud-count-badge">
+              Count: <span id="myHandPoints" class="pts">0</span>
+            </div>
+            <button id="sortCardsBtn" class="hud-sort-btn" title="Sort Cards Ascending (A ➔ K)">
+              <span style="font-size:13px; line-height:1;">≡</span> Sort
+            </button>
           </div>
         </div>
 
-        <!-- Interactive Hand Cards (Drag & Drop enabled) -->
+        <!-- Center Player Hand Cards -->
         <div id="myHandCards" class="hand-cards">
-          <!-- Rendered dynamically -->
+          <!-- Hand cards rendered dynamically -->
         </div>
 
-        <!-- Dynamic Controls (SHOW, SLASH, DROP) -->
-        <div class="controls-row">
-          <!-- SLASH BUTTON: Appears when holding cards matching the open discard rank -->
-          <button id="slashBtn" class="action-btn btn-slash-special" style="display:none;" title="Drop matching card without drawing!">
-            <span>⚡</span> SLASH (<span id="slashRankText"></span>)
-          </button>
-
-          <!-- Return Staged Card Button (Fallback if user doesn't tap middle box) -->
-          <button id="returnStagedCardBtn" class="action-btn btn-secondary" style="display:none; padding:8px 14px; font-size:12px;" title="Take staged card back to hand">
-            <span>↩️</span> Change Card
-          </button>
-
-          <!-- SHOW BUTTON: Strictly appears ONLY when hand total <= 10 on your turn -->
-          <button id="callShowBtn" class="action-btn btn-show-special" style="display:none;">
-            <span>👑</span> CALL SHOW (<span id="callShowPoints">0</span> pts)
-          </button>
-          
-          <button id="dropCardsBtn" class="action-btn btn-drop" style="display:none;">
-            <span>⬇️</span> Drop Selected Card(s)
-          </button>
+        <!-- Corner Contextual Action Button (Right: SHOW or SLASH) -->
+        <div class="player-hud-right">
+          <button id="cornerActionButton" class="corner-action-btn" style="display:none;"></button>
         </div>
       </div>
 

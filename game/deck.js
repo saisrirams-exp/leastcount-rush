@@ -112,9 +112,13 @@ function isValidDrop(cards) {
   if (!cards || cards.length === 0) return false;
   if (cards.length === 1) return true;
   
-  // Multiple cards must all have the same rank (or all be jokers)
+  // All cards have the same rank OR all are wild/jokers (0 points)
   const firstRank = cards[0].rank;
-  return cards.every(c => c.rank === firstRank);
+  const allSameRank = cards.every(c => c.rank === firstRank);
+  if (allSameRank) return true;
+
+  const allWild = cards.every(c => c.isWild || c.isJoker || c.rank === 'JOKER');
+  return allWild;
 }
 
 module.exports = {
