@@ -21,6 +21,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // In-memory room store
 const rooms = new Map(); // roomCode -> GameRoom
 const playerRoomMap = new Map(); // socketId -> roomCode
+const socketPlayerMap = new Map(); // socketId -> persistentPlayerId
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -39,7 +40,8 @@ function broadcastRoomState(room) {
     for (const socketId of sockets) {
       const socket = io.sockets.sockets.get(socketId);
       if (socket) {
-        socket.emit('gameState', room.getClientState(socketId));
+        const pId = socketPlayerMap.get(socketId) || socketId;
+        socket.emit('gameState', room.getClientState(pId));
       }
     }
   }
@@ -107,55 +109,61 @@ setInterval(() => {
 
 io.on('connection', (socket) => {
   // CREATE ROOM
-  socket.on('createRoom', ({ playerName, settings }) => {
+  socket.on('createRoom', ({ playerId, playerName, settings }) => {
+    const pId = playerId || socket.id;
     const code = generateRoomCode();
-    const room = new GameRoom(code, socket.id, playerName, settings);
+    const room = new GameRoom(code, pId, playerName, settings);
+    room.players[0].socketId = socket.id;
     rooms.set(code, room);
     playerRoomMap.set(socket.id, code);
+    socketPlayerMap.set(socket.id, pId);
 
     socket.join(code);
     socket.emit('roomJoined', {
       success: true,
       roomCode: code,
-      playerId: socket.id,
-      state: room.getClientState(socket.id)
+      playerId: pId,
+      state: room.getClientState(pId)
     });
-    console.log(`[Room ${code}] Created by ${playerName} (Max ${room.maxPlayers} players)`);
+    console.log(`[Room ${code}] Created by ${playerName} (${pId}) (Max ${room.maxPlayers} players)`);
   });
 
   // JOIN ROOM
-  socket.on('joinRoom', ({ roomCode, playerName }) => {
+  socket.on('joinRoom', ({ roomCode, playerId, playerName }) => {
     const code = (roomCode || '').toUpperCase().trim();
+    const pId = playerId || socket.id;
     const room = rooms.get(code);
 
     if (!room) {
-      return socket.emit('roomError', 'Table not found. Please check the code.');
+      return socket.emit('roomError', `Table "${code}" not found. Please verify the 5-letter code.`);
     }
 
-    const res = room.addPlayer(socket.id, playerName, false);
+    const res = room.addPlayer(pId, playerName, false, socket.id);
     if (!res.success) {
       return socket.emit('roomError', res.message);
     }
 
     playerRoomMap.set(socket.id, code);
+    socketPlayerMap.set(socket.id, pId);
     socket.join(code);
 
     socket.emit('roomJoined', {
       success: true,
       roomCode: code,
-      playerId: socket.id,
-      state: room.getClientState(socket.id)
+      playerId: pId,
+      state: room.getClientState(pId)
     });
 
     broadcastRoomState(room);
-    console.log(`[Room ${code}] ${playerName} joined (${room.players.length}/${room.maxPlayers})`);
+    console.log(`[Room ${code}] ${playerName} (${pId}) joined (${room.players.length}/${room.maxPlayers})`);
   });
 
   // UPDATE SETTINGS (Host only)
   socket.on('updateSettings', (settings) => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     const room = rooms.get(code);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== pId) return;
 
     room.updateSettings(settings);
     broadcastRoomState(room);
@@ -164,8 +172,9 @@ io.on('connection', (socket) => {
   // ADD BOT
   socket.on('addBot', () => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     const room = rooms.get(code);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== pId) return;
 
     room.addBot();
     broadcastRoomState(room);
@@ -174,8 +183,9 @@ io.on('connection', (socket) => {
   // FILL WITH BOTS TO MAX
   socket.on('fillBots', () => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     const room = rooms.get(code);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== pId) return;
 
     room.fillWithBots();
     broadcastRoomState(room);
@@ -184,8 +194,9 @@ io.on('connection', (socket) => {
   // REMOVE BOT
   socket.on('removeBot', (botId) => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     const room = rooms.get(code);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== pId) return;
 
     room.removeBot(botId);
     broadcastRoomState(room);
@@ -194,8 +205,9 @@ io.on('connection', (socket) => {
   // START GAME
   socket.on('startGame', () => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     const room = rooms.get(code);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== pId) return;
 
     const res = room.startNewGame();
     if (!res.success) {
@@ -208,8 +220,9 @@ io.on('connection', (socket) => {
   // START NEXT ROUND
   socket.on('nextRound', () => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     const room = rooms.get(code);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== pId) return;
 
     if (room.status === 'ROUND_OVER') {
       room.startNewRound();
@@ -220,10 +233,11 @@ io.on('connection', (socket) => {
   // DROP CARDS
   socket.on('dropCards', ({ cardIds }) => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id) || socket.id;
     const room = rooms.get(code);
     if (!room) return;
 
-    const res = room.handleDrop(socket.id, cardIds);
+    const res = room.handleDrop(pId, cardIds);
     if (!res.success) {
       return socket.emit('actionError', res.message);
     }
@@ -234,10 +248,11 @@ io.on('connection', (socket) => {
   // DRAW CARD
   socket.on('drawCard', ({ source }) => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id) || socket.id;
     const room = rooms.get(code);
     if (!room) return;
 
-    const res = room.handleDraw(socket.id, source);
+    const res = room.handleDraw(pId, source);
     if (!res.success) {
       return socket.emit('actionError', res.message);
     }
@@ -248,10 +263,11 @@ io.on('connection', (socket) => {
   // CALL SHOW
   socket.on('callShow', () => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id) || socket.id;
     const room = rooms.get(code);
     if (!room) return;
 
-    const res = room.handleCallShow(socket.id);
+    const res = room.handleCallShow(pId);
     if (!res.success) {
       return socket.emit('actionError', res.message);
     }
@@ -262,10 +278,11 @@ io.on('connection', (socket) => {
   // SLASH CARDS (Match & Drop)
   socket.on('slashCards', ({ cardIds }) => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id) || socket.id;
     const room = rooms.get(code);
     if (!room) return;
 
-    const res = room.handleSlash(socket.id, cardIds);
+    const res = room.handleSlash(pId, cardIds);
     if (!res.success) {
       return socket.emit('actionError', res.message);
     }
@@ -276,24 +293,27 @@ io.on('connection', (socket) => {
   // STOP GAME ENTIRELY (Host / Admin Only)
   socket.on('stopGame', () => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     const room = rooms.get(code);
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== pId) return;
 
     room.stopGame('Game was stopped by the table admin.');
     broadcastRoomState(room);
-    console.log(`[Room ${code}] Game stopped by admin ${socket.id}`);
+    console.log(`[Room ${code}] Game stopped by admin ${pId}`);
   });
 
   // LEAVE ROOM / EXIT OPTION
   socket.on('leaveRoom', () => {
     const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id);
     if (!code) return;
 
     const room = rooms.get(code);
     if (room) {
-      room.removePlayer(socket.id);
+      room.removePlayer(pId || socket.id);
       socket.leave(code);
       playerRoomMap.delete(socket.id);
+      socketPlayerMap.delete(socket.id);
 
       socket.emit('leftRoom', { success: true });
 
@@ -306,21 +326,30 @@ io.on('connection', (socket) => {
     }
   });
 
-  // DISCONNECT
+  // DISCONNECT (With 5-minute grace period before cleaning up)
   socket.on('disconnect', () => {
     const code = playerRoomMap.get(socket.id);
-    if (code) {
+    const pId = socketPlayerMap.get(socket.id);
+    if (code && pId) {
       const room = rooms.get(code);
       if (room) {
-        room.removePlayer(socket.id);
-        if (room.players.length === 0) {
-          rooms.delete(code);
-          console.log(`[Room ${code}] Deleted (empty)`);
-        } else {
-          broadcastRoomState(room);
-        }
+        room.setPlayerDisconnected(pId);
+        broadcastRoomState(room);
+
+        // Keep room alive for 5 minutes of disconnect before cleaning up
+        setTimeout(() => {
+          const r = rooms.get(code);
+          if (r) {
+            const anyActive = r.players.some(x => !x.isBot && x.connected);
+            if (!anyActive) {
+              rooms.delete(code);
+              console.log(`[Room ${code}] Cleaned up after all humans disconnected for 5 minutes.`);
+            }
+          }
+        }, 300000);
       }
       playerRoomMap.delete(socket.id);
+      socketPlayerMap.delete(socket.id);
     }
   });
 });

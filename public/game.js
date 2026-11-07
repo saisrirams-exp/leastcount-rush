@@ -3,7 +3,14 @@
 const socket = io();
 
 // Local State
-let myPlayerId = null;
+// Isolated unique player ID per browser session/tab, persisting across page reloads and reconnects
+let persistentPlayerId = sessionStorage.getItem('leastcount_user_id');
+if (!persistentPlayerId) {
+  persistentPlayerId = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+  sessionStorage.setItem('leastcount_user_id', persistentPlayerId);
+}
+
+let myPlayerId = persistentPlayerId;
 let currentRoomCode = null;
 let gameState = null;
 let selectedCards = new Set(); // Set of card IDs selected in hand
@@ -18,6 +25,13 @@ const lobbyScreen = document.getElementById('lobbyScreen');
 const gameScreen = document.getElementById('gameScreen');
 const createTableModal = document.getElementById('createTableModal');
 const resultsModal = document.getElementById('resultsModal');
+
+// Invite Link Elements
+const inviteBlock = document.getElementById('inviteBlock');
+const standardBlock = document.getElementById('standardBlock');
+const inviteCodeLabel = document.getElementById('inviteCodeLabel');
+const inviteJoinBtn = document.getElementById('inviteJoinBtn');
+const showNormalHomeBtn = document.getElementById('showNormalHomeBtn');
 
 const roomBadge = document.getElementById('roomBadge');
 const roomBadgeCode = document.getElementById('roomBadgeCode');
@@ -91,10 +105,49 @@ const nextRoundBtn = document.getElementById('nextRoundBtn');
 // Helper: Save and load player name from localStorage
 playerNameInput.value = localStorage.getItem('leastcount_player_name') || '';
 
-// URL Room Code Auto-Fill (e.g. ?room=ABCD)
+// URL Room Code Auto-Fill & Dedicated Invite View
 const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.has('room')) {
-  joinCodeInput.value = urlParams.get('room').toUpperCase();
+const inviteRoom = urlParams.get('room');
+if (inviteRoom && inviteRoom.trim().length > 0) {
+  const cleanCode = inviteRoom.toUpperCase().trim();
+  joinCodeInput.value = cleanCode;
+  if (inviteCodeLabel) inviteCodeLabel.innerText = cleanCode;
+
+  // Only show invite screen if we are not already in this room
+  if (sessionStorage.getItem('leastcount_current_room') !== cleanCode) {
+    if (inviteBlock) inviteBlock.style.display = 'block';
+    if (standardBlock) standardBlock.style.display = 'none';
+  }
+}
+
+if (showNormalHomeBtn) {
+  showNormalHomeBtn.addEventListener('click', () => {
+    inviteBlock.style.display = 'none';
+    standardBlock.style.display = 'block';
+  });
+}
+
+if (inviteJoinBtn) {
+  inviteJoinBtn.addEventListener('click', () => {
+    let name = playerNameInput.value.trim();
+    if (!name) {
+      name = 'Player_' + Math.floor(100 + Math.random() * 900);
+      playerNameInput.value = name;
+    }
+    const code = joinCodeInput.value.trim().toUpperCase();
+    if (!code) {
+      alert('Please enter a room code.');
+      return;
+    }
+    localStorage.setItem('leastcount_player_name', name);
+    sessionStorage.setItem('leastcount_current_room', code);
+
+    socket.emit('joinRoom', {
+      roomCode: code,
+      playerId: persistentPlayerId,
+      playerName: name
+    });
+  });
 }
 
 // -----------------------------------------------------------------------------
@@ -173,6 +226,7 @@ adminStopGameBtn.addEventListener('click', () => {
 
 socket.on('leftRoom', () => {
   currentRoomCode = null;
+  sessionStorage.removeItem('leastcount_current_room');
   gameState = null;
   selectedCards.clear();
   
@@ -190,11 +244,16 @@ socket.on('leftRoom', () => {
 // SOCKET EVENT EMITTERS
 // -----------------------------------------------------------------------------
 confirmCreateBtn.addEventListener('click', () => {
-  const name = playerNameInput.value.trim() || 'Player';
+  let name = playerNameInput.value.trim();
+  if (!name) {
+    name = 'Host_' + Math.floor(100 + Math.random() * 900);
+    playerNameInput.value = name;
+  }
   localStorage.setItem('leastcount_player_name', name);
   const maxP = parseInt(maxPlayersSlider.value, 10);
 
   socket.emit('createRoom', {
+    playerId: persistentPlayerId,
     playerName: name,
     settings: {
       maxPlayers: maxP,
@@ -207,16 +266,22 @@ confirmCreateBtn.addEventListener('click', () => {
 });
 
 joinRoomBtn.addEventListener('click', () => {
-  const name = playerNameInput.value.trim() || 'Player';
+  let name = playerNameInput.value.trim();
+  if (!name) {
+    name = 'Player_' + Math.floor(100 + Math.random() * 900);
+    playerNameInput.value = name;
+  }
   const code = joinCodeInput.value.trim().toUpperCase();
   if (!code) {
     alert('Please enter a 5-letter room code.');
     return;
   }
   localStorage.setItem('leastcount_player_name', name);
+  sessionStorage.setItem('leastcount_current_room', code);
 
   socket.emit('joinRoom', {
     roomCode: code,
+    playerId: persistentPlayerId,
     playerName: name
   });
 });
@@ -386,9 +451,25 @@ callShowBtn.addEventListener('click', () => {
 // -----------------------------------------------------------------------------
 // SOCKET LISTENERS & STATE HANDLING
 // -----------------------------------------------------------------------------
+// Automatically reconnect/rejoin if connection was interrupted or page was refreshed
+socket.on('connect', () => {
+  const savedRoom = currentRoomCode || sessionStorage.getItem('leastcount_current_room');
+  if (savedRoom) {
+    const savedName = localStorage.getItem('leastcount_player_name') || 'Player';
+    socket.emit('joinRoom', {
+      roomCode: savedRoom,
+      playerId: persistentPlayerId,
+      playerName: savedName
+    });
+  }
+});
+
 socket.on('roomJoined', (data) => {
-  myPlayerId = data.playerId;
+  myPlayerId = data.playerId || persistentPlayerId;
+  persistentPlayerId = myPlayerId;
+  sessionStorage.setItem('leastcount_user_id', persistentPlayerId);
   currentRoomCode = data.roomCode;
+  sessionStorage.setItem('leastcount_current_room', data.roomCode);
 
   roomBadge.style.display = 'flex';
   exitTableBtn.style.display = 'inline-block';
@@ -409,7 +490,7 @@ socket.on('turnTimerTick', ({ turnTimeRemaining, currentTurnPlayerId }) => {
   timerCircle.innerText = turnTimeRemaining;
   if (turnTimeRemaining <= 3) {
     timerCircle.classList.add('danger');
-    if (currentTurnPlayerId === myPlayerId) {
+    if (currentTurnPlayerId === persistentPlayerId) {
       window.soundFx.playTimerTick();
     }
   } else {
@@ -418,7 +499,13 @@ socket.on('turnTimerTick', ({ turnTimeRemaining, currentTurnPlayerId }) => {
 });
 
 socket.on('roomError', (msg) => {
+  sessionStorage.removeItem('leastcount_current_room');
   alert(`Error: ${msg}`);
+  if (lobbyScreen.style.display !== 'none' || gameScreen.style.display !== 'none') {
+    lobbyScreen.style.display = 'none';
+    gameScreen.style.display = 'none';
+    homeScreen.style.display = 'flex';
+  }
 });
 
 socket.on('actionError', (msg) => {
@@ -430,7 +517,8 @@ socket.on('actionError', (msg) => {
 // -----------------------------------------------------------------------------
 function renderGameState(state) {
   gameState = state;
-  isHost = state.hostId === myPlayerId;
+  myPlayerId = persistentPlayerId;
+  isHost = state.hostId === persistentPlayerId;
 
   // Header controls
   adminStopGameBtn.style.display = isHost && state.status === 'PLAYING' ? 'inline-block' : 'none';
@@ -539,7 +627,7 @@ function renderGameTable(state) {
       <div style="font-size:16px;">${icon}</div>
       <div class="p-name">${p.name}${isMe ? ' (You)' : ''}</div>
       <div class="p-stats">
-        <span class="p-cards">🂠 ${p.cardCount}</span>
+        <span class="p-cards">${p.waitingNextRound ? 'Spectating' : `🂠 ${p.cardCount}`}</span>
         <span class="p-score">${p.score} pts</span>
       </div>
     `;
@@ -550,7 +638,7 @@ function renderGameTable(state) {
   const myPlayer = state.players.find(p => p.id === myPlayerId);
   if (myPlayer) {
     myGameScore.innerText = myPlayer.score;
-    myHandPoints.innerText = myPlayer.handScore !== null ? myPlayer.handScore : '--';
+    myHandPoints.innerText = myPlayer.waitingNextRound ? 'Spectating' : (myPlayer.handScore !== null ? myPlayer.handScore : '--');
 
     updateHandUI();
     updateActionUI();
@@ -561,6 +649,16 @@ function updateHandUI() {
   if (!gameState) return;
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
   if (!myPlayer) return;
+
+  if (myPlayer.waitingNextRound) {
+    myHandCards.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 22px; text-align: center; background: rgba(0,0,0,0.35); border-radius: 14px; border: 1.5px dashed rgba(245,197,66,0.4); margin: 6px auto; max-width: 500px;">
+        <div style="font-size: 18px; font-weight: bold; color: var(--gold); margin-bottom: 6px;">⏳ Spectating Round ${gameState.roundNumber}</div>
+        <div style="color: rgba(253,250,243,0.85); font-size: 13px;">You joined while this round was in progress! You will be dealt cards automatically as soon as Round ${gameState.roundNumber + 1} begins.</div>
+      </div>
+    `;
+    return;
+  }
 
   const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
   const isDropPhase = isMyTurn && gameState.turnPhase === 'DROP';
@@ -656,10 +754,15 @@ function updateActionUI() {
   discardStackPile.classList.remove('can-draw');
   middleDottedDropBox.classList.remove('active-drop');
 
-  if (!isMyTurn || myPlayer?.eliminated) {
+  if (!isMyTurn || myPlayer?.eliminated || myPlayer?.waitingNextRound) {
     turnStatusBadge.className = 'turn-status-badge';
-    turnStatusBadge.innerText = myPlayer?.eliminated ? 'Eliminated 💀' : `Waiting for ${gameState.currentTurnPlayerName}…`;
-    turnGuidePrompt.innerText = `It is currently ${gameState.currentTurnPlayerName}'s turn. Cards appear on the right discard stack as they play.`;
+    if (myPlayer?.waitingNextRound) {
+      turnStatusBadge.innerText = 'Spectating this round 👁️';
+      turnGuidePrompt.innerText = `Round ${gameState.roundNumber} is in progress. You'll be dealt cards when Round ${gameState.roundNumber + 1} begins!`;
+    } else {
+      turnStatusBadge.innerText = myPlayer?.eliminated ? 'Eliminated 💀' : `Waiting for ${gameState.currentTurnPlayerName}…`;
+      turnGuidePrompt.innerText = `It is currently ${gameState.currentTurnPlayerName}'s turn. Cards appear on the right discard stack as they play.`;
+    }
 
     callShowBtn.style.display = 'none';
     slashBtn.style.display = 'none';

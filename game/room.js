@@ -40,27 +40,44 @@ class GameRoom {
     this.addPlayer(hostId, hostName, false);
   }
 
-  addPlayer(id, name, isBot = false) {
-    if (this.players.length >= this.maxPlayers) {
-      return { success: false, message: `Room is full (max ${this.maxPlayers} players)` };
+  addPlayer(id, name, isBot = false, socketId = null) {
+    // 1. Reconnection check (player with same ID already in room)
+    const existing = this.players.find(p => p.id === id);
+    if (existing) {
+      existing.connected = true;
+      existing.socketId = socketId;
+      if (name && !existing.isBot) existing.name = name.trim();
+      return { success: true, player: existing, reconnected: true };
     }
-    if (this.status !== 'LOBBY') {
-      return { success: false, message: 'Game has already started' };
+
+    // 2. Capacity check
+    if (this.players.length >= this.maxPlayers) {
+      return { success: false, message: `Table is full (max ${this.maxPlayers} players)` };
     }
 
     const player = {
       id,
+      socketId,
       name: name.trim() || (isBot ? `Bot_${Math.floor(100 + Math.random() * 900)}` : 'Player'),
       isBot,
       connected: true,
       score: 0,
       hand: [],
       eliminated: false,
-      droppedThisTurn: [] // cards dropped during the drop phase
+      waitingNextRound: this.status === 'PLAYING',
+      droppedThisTurn: []
     };
 
     this.players.push(player);
-    return { success: true, player };
+    return { success: true, player, reconnected: false };
+  }
+
+  setPlayerDisconnected(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (player) {
+      player.connected = false;
+      player.disconnectedAt = Date.now();
+    }
   }
 
   removePlayer(playerId) {
@@ -69,7 +86,7 @@ class GameRoom {
 
     const removed = this.players.splice(idx, 1)[0];
 
-    // If host leaves, assign next human player as host
+    // If host leaves, assign next connected human player as host
     if (this.hostId === playerId) {
       const nextHuman = this.players.find(p => !p.isBot);
       if (nextHuman) {
@@ -142,7 +159,7 @@ class GameRoom {
   }
 
   getActivePlayers() {
-    return this.players.filter(p => !p.eliminated);
+    return this.players.filter(p => !p.eliminated && !p.waitingNextRound);
   }
 
   startNewGame() {
@@ -155,6 +172,7 @@ class GameRoom {
     this.players.forEach(p => {
       p.score = 0;
       p.eliminated = false;
+      p.waitingNextRound = false;
       p.hand = [];
     });
 
@@ -166,6 +184,13 @@ class GameRoom {
     this.roundNumber++;
     this.status = 'PLAYING';
     this.roundResults = null;
+
+    // Reset waiting players and hands so everyone starts fresh!
+    this.players.forEach(p => {
+      p.waitingNextRound = false;
+      p.hand = [];
+      p.droppedThisTurn = [];
+    });
 
     // Build shoe based on player capacity
     this.deckCountUsed = getDeckCountForPlayerCapacity(this.maxPlayers);
@@ -345,6 +370,7 @@ class GameRoom {
       p.hand = [];
       p.score = 0;
       p.eliminated = false;
+      p.waitingNextRound = false;
       p.droppedThisTurn = [];
     });
     this.lastAction = { type: 'STOPPED', text: reason };
@@ -685,6 +711,8 @@ class GameRoom {
         name: p.name,
         isBot: p.isBot,
         score: p.score,
+        connected: p.connected !== false,
+        waitingNextRound: p.waitingNextRound || false,
         cardCount: p.hand.length,
         eliminated: p.eliminated,
         // Only reveal the actual cards if it's the requested player or round is over
