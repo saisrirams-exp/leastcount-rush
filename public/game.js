@@ -1123,13 +1123,13 @@ function renderOpponents(opponents, currentTurnPlayerId) {
       }
 
       if (total <= 5) {
-        slotDiv.className = `opponent-slot ${slotClass} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+        slotDiv.className = `opponent-slot compact-landscape ${slotClass} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
       } else {
-        // 6 to 14 opponents: Wide Elliptical Perimeter Arc
+        // 6 to 14 opponents: Wide Elliptical Perimeter Arc (Curves safely below HUD)
         const angle = Math.PI - (idx / (total - 1)) * Math.PI;
         const leftPct = 50 - 44 * Math.cos(angle);
-        const topPct = 34 - 24 * Math.sin(angle);
-        slotDiv.className = `opponent-slot ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+        const topPct = 38 - 21 * Math.sin(angle);
+        slotDiv.className = `opponent-slot compact-landscape ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
         slotDiv.style.left = `${leftPct}%`;
         slotDiv.style.top = `${topPct}%`;
         slotDiv.style.transform = 'translate(-50%, -50%)';
@@ -1260,7 +1260,7 @@ function getCourtSvg(rank, suit, isRed) {
 // Authentic Playing Card Inner HTML (clean indices, centered royalty/pip, NO 'pts' stamp)
 function createCardInner(card, isTableJoker = false) {
   if (card.rank === '?') {
-    return `<div style="margin:auto; font-size:24px; color:#aaa;">🂠</div>`;
+    return `<div style="margin:auto; font-size:24px; color:#555;">🂠</div>`;
   }
 
   const isJoker = card.isJoker || card.rank === 'JOKER';
@@ -1268,6 +1268,7 @@ function createCardInner(card, isTableJoker = false) {
   const isRed = card.color === 'red' || card.suit === '♥' || card.suit === '♦';
   const suitIcon = isJoker ? '★' : (card.suit || '');
   const rankText = isJoker ? 'J' : card.rank;
+  const suitColor = isRed ? '#d00000' : '#111111';
 
   let centerContent = '';
   if (isJoker) {
@@ -1286,7 +1287,7 @@ function createCardInner(card, isTableJoker = false) {
   } else {
     // Number card or Ace
     centerContent = `
-      <div class="number-center-suit ${isRed ? 'red-suit' : 'black-suit'}">
+      <div class="number-center-suit" style="color:${suitColor};">
         ${suitIcon}
       </div>
     `;
@@ -1297,13 +1298,13 @@ function createCardInner(card, isTableJoker = false) {
   ` : '';
 
   return `
-    <div class="card-index top-left">
+    <div class="card-index top-left" style="color:${suitColor};">
       <span class="index-rank">${rankText}</span>
       <span class="index-suit">${suitIcon}</span>
     </div>
     ${centerContent}
     ${wildBadge}
-    <div class="card-index bottom-right">
+    <div class="card-index bottom-right" style="color:${suitColor};">
       <span class="index-rank">${rankText}</span>
       <span class="index-suit">${suitIcon}</span>
     </div>
