@@ -26,6 +26,7 @@
         <button id="copyInviteBtn" class="table-copy-btn" title="Copy Invite Link">📋</button>
       </div>
       <div class="header-action-group">
+        <button id="openRulesBtn" class="header-action-btn btn-rules" title="How to Play & Rules">❓ Rules</button>
         <button id="adminStopGameBtn" class="header-action-btn btn-admin-stop" style="display:none;" title="End Game for All (Admin)">🛑 Stop</button>
         <button id="exitTableBtn" class="header-action-btn btn-exit" style="display:none;" title="Leave Table">🚪 Exit</button>
       </div>
@@ -39,15 +40,36 @@
     <section id="homeScreen" class="screen">
       <div class="lobby-card">
         <div class="lobby-hero">
-          <div style="font-size: 48px; margin-bottom: 8px;">👑</div>
+          <div id="heroAvatarDisplay" style="font-size: 48px; margin-bottom: 8px;">👑</div>
           <h2>Least Count Rush</h2>
           <p>The high-speed lowest-hand card game built for 6 to 15 players with multi-deck scaling.</p>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom:12px;">
           <label for="playerNameInput">Your Name</label>
           <input type="text" id="playerNameInput" class="text-input" placeholder="Enter your name" maxlength="15" autocomplete="off">
         </div>
+
+        <!-- Avatar Selector -->
+        <div class="form-group" style="margin-bottom:14px;">
+          <label style="font-size:12px; font-weight:700; color:rgba(253,250,243,0.85); display:block; margin-bottom:6px;">Choose Your Avatar</label>
+          <div id="avatarSelector" class="avatar-selector-grid">
+            <span class="avatar-opt active" data-avatar="👑">👑</span>
+            <span class="avatar-opt" data-avatar="🦁">🦁</span>
+            <span class="avatar-opt" data-avatar="🐯">🐯</span>
+            <span class="avatar-opt" data-avatar="🦊">🦊</span>
+            <span class="avatar-opt" data-avatar="🐼">🐼</span>
+            <span class="avatar-opt" data-avatar="⚡">⚡</span>
+            <span class="avatar-opt" data-avatar="💎">💎</span>
+            <span class="avatar-opt" data-avatar="🚀">🚀</span>
+            <span class="avatar-opt" data-avatar="🃏">🃏</span>
+            <span class="avatar-opt" data-avatar="🥷">🥷</span>
+            <span class="avatar-opt" data-avatar="🐺">🐺</span>
+            <span class="avatar-opt" data-avatar="🔥">🔥</span>
+          </div>
+        </div>
+
+        <button id="homeRulesBtn" class="btn-text-link" style="display:block; margin:0 auto 14px auto; font-size:13px; color:var(--gold); text-decoration:underline; background:none; border:none; cursor:pointer;">📖 How to Play & Game Rules</button>
 
         <!-- If visiting via invite link (?room=CODE) -->
         <div id="inviteBlock" style="display:none;">
@@ -295,9 +317,72 @@
         </div>
       </div>
 
+      <!-- Face Card Scoring Mode (Play Store vs Classic) -->
+      <div class="form-group">
+        <label>Face Card Points (10, J, Q, K)</label>
+        <div class="pill-group" id="faceScorePills">
+          <div class="pill-opt active" data-val="STANDARD_10">10 Pts Each (Play Store)</div>
+          <div class="pill-opt" data-val="CLASSIC_13">10, 11, 12, 13 (Classic)</div>
+        </div>
+      </div>
+
       <div style="display:flex; gap:10px; margin-top:24px;">
         <button id="cancelCreateModalBtn" class="btn-secondary" style="flex:1;">Cancel</button>
         <button id="confirmCreateBtn" class="btn-primary" style="flex:1;">Create Table</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW TO PLAY / RULES MODAL -->
+  <div id="rulesModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:520px; max-height:88dvh; overflow-y:auto;">
+      <div class="modal-header">
+        <h2>📖 How to Play Least Count Rush</h2>
+        <p style="font-size:13px; color:rgba(253,250,243,0.7); margin-top:4px;">Official Rules & Scoring Guide</p>
+      </div>
+
+      <div class="rules-body">
+        <div class="rule-box">
+          <h4 style="color:var(--gold); margin-bottom:4px;">🎯 The Objective</h4>
+          <p style="font-size:13px; color:rgba(253,250,243,0.9); line-height:1.5;">Finish each round with the <strong>lowest card points</strong>. Scores accumulate over rounds until players exceed the elimination threshold (e.g. 150 pts). The last survivor wins!</p>
+        </div>
+
+        <div class="rule-box" style="margin-top:12px;">
+          <h4 style="color:var(--gold); margin-bottom:6px;">🃏 Card Point Values</h4>
+          <div class="rule-chips-grid">
+            <div class="rule-chip"><span class="chip-pts gold">0 pts</span> <strong>Wilds & Jokers</strong></div>
+            <div class="rule-chip"><span class="chip-pts green">1 pt</span> <strong>Aces (All suits)</strong></div>
+            <div class="rule-chip"><span class="chip-pts blue">2–9 pts</span> <strong>Face values (2-9)</strong></div>
+            <div class="rule-chip"><span class="chip-pts red">10 pts</span> <strong>10, J, Q, K</strong> <small>(or 10-13 Classic)</small></div>
+          </div>
+        </div>
+
+        <div class="rule-box" style="margin-top:12px;">
+          <h4 style="color:var(--gold); margin-bottom:6px;">🔄 Turn Flow: Drop & Draw</h4>
+          <ol style="margin:0; padding-left:18px; font-size:12.5px; color:rgba(253,250,243,0.9); line-height:1.6;">
+            <li><strong>Select & Drop:</strong> Select 1 card or multiple cards of the <em>same rank</em> (e.g. two 8s) and place them into the <strong>Middle Drop Zone</strong>.</li>
+            <li><strong>Change Mind:</strong> Tap any other card in your hand to swap it into the drop zone before committing.</li>
+            <li><strong>Draw to Finish:</strong> Tap either the <strong>Left Closed Deck</strong> or <strong>Right Open Discard Pile</strong> to draw 1 card. Your dropped card becomes the top discard for the next player!</li>
+          </ol>
+        </div>
+
+        <div class="rule-box" style="margin-top:12px;">
+          <h4 style="color:#f5c542; margin-bottom:4px;">⚡ 1-Tap SLASH (The Rush Move)</h4>
+          <p style="font-size:12.5px; color:rgba(253,250,243,0.9); line-height:1.5;">When the previous player drops a card that matches a card in your hand, tap <strong>⚡ SLASH</strong>! You drop your matching card(s) <strong>without drawing any replacement</strong>, shrinking your hand immediately!</p>
+        </div>
+
+        <div class="rule-box" style="margin-top:12px;">
+          <h4 style="color:var(--gold); margin-bottom:4px;">👑 Calling SHOW (Declaration)</h4>
+          <ul style="margin:0; padding-left:18px; font-size:12.5px; color:rgba(253,250,243,0.9); line-height:1.6;">
+            <li>Only permitted when your hand total is <strong>10 points or below</strong> before dropping cards.</li>
+            <li><strong style="color:var(--success);">Good Show:</strong> If your hand is strictly lowest at the table, you score <strong>0 points</strong>! Other players score their full hand points.</li>
+            <li><strong style="color:var(--danger);">Bad Show:</strong> If anyone ties or beats your score, you take a heavy <strong>+40 penalty points</strong>!</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;">
+        <button id="closeRulesBtn" class="btn-primary" style="width:100%; font-size:15px;">Got It, Let's Play! ➔</button>
       </div>
     </div>
   </div>

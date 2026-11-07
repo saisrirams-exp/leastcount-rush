@@ -3,26 +3,34 @@
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-// Point values based on Least Count standard rules:
-// Ace = 1, Numbers = face value (2-10), Jack = 11, Queen = 12, King = 13, Jokers = 0
-function getCardPointValue(rank, wildJokerRank = null) {
+// Point values based on Least Count rules:
+// Ace = 1, Numbers 2-9 = face value, Jokers/Wilds = 0.
+// Face Card Scoring Modes:
+// - STANDARD_10 (Default Play Store style): 10, J, Q, K = 10 pts each
+// - CLASSIC_13 (Indian Classic style): 10 = 10, J = 11, Q = 12, K = 13
+function getCardPointValue(rank, wildJokerRank = null, faceCardScoring = 'STANDARD_10') {
   if (rank === 'JOKER') return 0;
   if (wildJokerRank && rank === wildJokerRank) return 0;
   if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  return parseInt(rank, 10);
+  if (faceCardScoring === 'CLASSIC_13') {
+    if (rank === 'J') return 11;
+    if (rank === 'Q') return 12;
+    if (rank === 'K') return 13;
+  } else {
+    // STANDARD_10 (10, J, Q, K are 10 points each)
+    if (['10', 'J', 'Q', 'K'].includes(rank)) return 10;
+  }
+  return parseInt(rank, 10) || 0;
 }
 
-function applyWildJokerToCard(card, wildJokerRank) {
+function applyWildJokerToCard(card, wildJokerRank, faceCardScoring = 'STANDARD_10') {
   if (!card) return card;
   if (card.isJoker || (wildJokerRank && card.rank === wildJokerRank)) {
     card.isWild = true;
     card.points = 0;
   } else {
     card.isWild = false;
-    card.points = getCardPointValue(card.rank);
+    card.points = getCardPointValue(card.rank, null, faceCardScoring);
   }
   return card;
 }
@@ -42,7 +50,7 @@ function getDeckCountForPlayerCapacity(maxPlayers) {
 /**
  * Creates and shuffles a multi-deck shoe with jokers.
  */
-function createShoe(deckCount = 2, includeJokers = true) {
+function createShoe(deckCount = 2, includeJokers = true, faceCardScoring = 'STANDARD_10') {
   const cards = [];
   let cardId = 1;
 
@@ -54,7 +62,7 @@ function createShoe(deckCount = 2, includeJokers = true) {
           rank,
           suit,
           color: (suit === '♥' || suit === '♦') ? 'red' : 'black',
-          points: getCardPointValue(rank),
+          points: getCardPointValue(rank, null, faceCardScoring),
           isJoker: false
         });
       }

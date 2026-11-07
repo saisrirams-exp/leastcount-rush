@@ -40,6 +40,11 @@ const copyInviteLinkBtn = document.getElementById('copyInviteLinkBtn');
 const shareInviteBtn = document.getElementById('shareInviteBtn');
 const exitTableBtn = document.getElementById('exitTableBtn');
 const adminStopGameBtn = document.getElementById('adminStopGameBtn');
+const openRulesBtn = document.getElementById('openRulesBtn');
+const homeRulesBtn = document.getElementById('homeRulesBtn');
+const rulesModal = document.getElementById('rulesModal');
+const closeRulesBtn = document.getElementById('closeRulesBtn');
+const heroAvatarDisplay = document.getElementById('heroAvatarDisplay');
 const gameToast = document.getElementById('gameToast');
 
 let toastTimer = null;
@@ -52,6 +57,23 @@ function showToast(msg, duration = 2400) {
     gameToast.style.display = 'none';
   }, duration);
 }
+
+// Mobile Tactical Haptic Feedback (Vibration API)
+function triggerHaptic(type = 'tap') {
+  if (!navigator.vibrate) return;
+  try {
+    if (type === 'tap') navigator.vibrate(15);
+    else if (type === 'drop') navigator.vibrate(25);
+    else if (type === 'draw') navigator.vibrate(30);
+    else if (type === 'slash') navigator.vibrate([40, 30, 60]);
+    else if (type === 'show') navigator.vibrate([60, 40, 100]);
+    else if (type === 'turn') navigator.vibrate([50, 40, 50]);
+  } catch (e) {}
+}
+
+let selectedFaceScore = 'STANDARD_10';
+let myAvatar = localStorage.getItem('leastcount_avatar') || '👑';
+let lastTurnPlayerId = null;
 
 // Global Hand Auto-Sort Preference (defaults to true)
 let isAutoSortEnabled = localStorage.getItem('leastcount_autosort') !== 'false';
@@ -76,7 +98,7 @@ function sortCardsArray(cards, ascending = true) {
     if (pA !== pB) {
       return ascending ? pA - pB : pB - pA;
     }
-    // 2. Rank numerical order
+    // 2. Rank numerical order (A < 2-10 < J < Q < K)
     const rvA = getRankVal(a.rank);
     const rvB = getRankVal(b.rank);
     if (rvA !== rvB) {
@@ -199,7 +221,8 @@ if (inviteJoinBtn) {
     socket.emit('joinRoom', {
       roomCode: code,
       playerId: persistentPlayerId,
-      playerName: name
+      playerName: name,
+      avatar: myAvatar
     });
   });
 }
@@ -228,6 +251,7 @@ document.querySelectorAll('#elimScorePills .pill-opt').forEach(pill => {
     document.querySelectorAll('#elimScorePills .pill-opt').forEach(p => p.classList.remove('active'));
     pill.classList.add('active');
     selectedElimScore = parseInt(pill.dataset.val, 10);
+    triggerHaptic('tap');
   });
 });
 
@@ -237,6 +261,48 @@ document.querySelectorAll('#turnTimerPills .pill-opt').forEach(pill => {
     document.querySelectorAll('#turnTimerPills .pill-opt').forEach(p => p.classList.remove('active'));
     pill.classList.add('active');
     selectedTurnDuration = parseInt(pill.dataset.val, 10);
+    triggerHaptic('tap');
+  });
+});
+
+// Face card scoring mode pill selection
+document.querySelectorAll('#faceScorePills .pill-opt').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('#faceScorePills .pill-opt').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    selectedFaceScore = pill.dataset.val;
+    triggerHaptic('tap');
+  });
+});
+
+// Rules Modal open & close
+function openRules() {
+  if (rulesModal) rulesModal.style.display = 'flex';
+  triggerHaptic('tap');
+}
+function closeRules() {
+  if (rulesModal) rulesModal.style.display = 'none';
+  triggerHaptic('tap');
+}
+if (openRulesBtn) openRulesBtn.addEventListener('click', openRules);
+if (homeRulesBtn) homeRulesBtn.addEventListener('click', openRules);
+if (closeRulesBtn) closeRulesBtn.addEventListener('click', closeRules);
+
+// Avatar Selection & Persistence
+if (heroAvatarDisplay) heroAvatarDisplay.innerText = myAvatar;
+document.querySelectorAll('#avatarSelector .avatar-opt').forEach(opt => {
+  if (opt.dataset.avatar === myAvatar) {
+    document.querySelectorAll('#avatarSelector .avatar-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+  }
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('#avatarSelector .avatar-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    myAvatar = opt.dataset.avatar;
+    localStorage.setItem('leastcount_avatar', myAvatar);
+    if (heroAvatarDisplay) heroAvatarDisplay.innerText = myAvatar;
+    triggerHaptic('tap');
+    showToast(`Avatar selected: ${myAvatar}`);
   });
 });
 
@@ -336,10 +402,12 @@ confirmCreateBtn.addEventListener('click', () => {
   socket.emit('createRoom', {
     playerId: persistentPlayerId,
     playerName: name,
+    avatar: myAvatar,
     settings: {
       maxPlayers: maxP,
       eliminationScore: selectedElimScore,
-      turnDuration: selectedTurnDuration
+      turnDuration: selectedTurnDuration,
+      faceCardScoring: selectedFaceScore
     }
   });
 
@@ -363,7 +431,8 @@ joinRoomBtn.addEventListener('click', () => {
   socket.emit('joinRoom', {
     roomCode: code,
     playerId: persistentPlayerId,
-    playerName: name
+    playerName: name,
+    avatar: myAvatar
   });
 });
 
@@ -752,14 +821,15 @@ function renderGameState(state) {
 function renderLobby(state) {
   playerCountLabel.innerText = state.players.length;
   maxCapacityLabel.innerText = state.maxPlayers;
-  lobbyCapacityLabel.innerText = `Supports ${state.maxPlayers} Players • ${state.deckCountUsed} Decks • Knockout at ${state.eliminationScore} pts`;
+  const scoringName = state.faceCardScoring === 'CLASSIC_13' ? 'Classic (10-13)' : 'Standard (10s)';
+  lobbyCapacityLabel.innerText = `Supports ${state.maxPlayers} Players • ${state.deckCountUsed} Decks • ${scoringName} • Knockout at ${state.eliminationScore} pts`;
 
   waitingPlayerList.innerHTML = '';
   state.players.forEach(p => {
     const chip = document.createElement('div');
     chip.className = 'waiting-player-chip';
 
-    const avatar = p.isBot ? '🤖' : (p.id === state.hostId ? '👑' : '👤');
+    const avatar = p.isBot ? '🤖' : (p.avatar || (p.id === state.hostId ? '👑' : '👤'));
     const role = p.id === state.hostId ? 'HOST' : (p.isBot ? 'BOT' : 'PLAYER');
 
     chip.innerHTML = `
@@ -790,7 +860,8 @@ function renderLobby(state) {
 // 2. Render In-Game Table & 6 to 15 Player Arena
 function renderGameTable(state) {
   roundNumberBadge.innerText = state.roundNumber;
-  deckShoeBadge.innerText = `(${state.deckCountUsed} Decks Shoe)`;
+  const scoringBadge = state.faceCardScoring === 'CLASSIC_13' ? 'Classic 10-13' : 'Standard 10s';
+  deckShoeBadge.innerText = `(${state.deckCountUsed} Decks • ${scoringBadge})`;
   eliminationScoreBadge.innerText = state.eliminationScore;
   maxScoreTarget.innerText = state.eliminationScore;
 
@@ -824,7 +895,7 @@ function renderGameTable(state) {
     const badge = document.createElement('div');
     badge.className = `stadium-badge ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
 
-    const icon = p.eliminated ? '💀' : (p.isBot ? '🤖' : (isMe ? '⭐' : '👤'));
+    const icon = p.eliminated ? '💀' : (p.isBot ? '🤖' : (p.avatar || (isMe ? '⭐' : '👤')));
 
     badge.innerHTML = `
       ${isCurrentTurn ? '<div class="turn-indicator"></div>' : ''}
@@ -1016,6 +1087,7 @@ function updateActionUI() {
   renderMiddleDropBox(isMyTurn, turnPhase);
 
   if (!isMyTurn || myPlayer?.eliminated || myPlayer?.waitingNextRound) {
+    lastTurnPlayerId = null;
     stagedCards = [];
     renderMiddleDropBox(false, turnPhase);
 
@@ -1035,6 +1107,10 @@ function updateActionUI() {
   }
 
   // IT IS MY TURN!
+  if (lastTurnPlayerId !== myPlayerId) {
+    triggerHaptic('turn');
+    lastTurnPlayerId = myPlayerId;
+  }
   turnStatusBadge.className = 'turn-status-badge my-turn';
 
   // 1. If card is staged in middle box: pick a card from LEFT deck or RIGHT discard to finish turn!

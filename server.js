@@ -127,10 +127,10 @@ setInterval(() => {
 
 io.on('connection', (socket) => {
   // CREATE ROOM
-  socket.on('createRoom', ({ playerId, playerName, settings }) => {
+  socket.on('createRoom', ({ playerId, playerName, avatar, settings }) => {
     const pId = playerId || socket.id;
     const code = generateRoomCode();
-    const room = new GameRoom(code, pId, playerName, settings);
+    const room = new GameRoom(code, pId, playerName, settings, avatar);
     room.players[0].socketId = socket.id;
     rooms.set(code, room);
     playerRoomMap.set(socket.id, code);
@@ -147,7 +147,7 @@ io.on('connection', (socket) => {
   });
 
   // JOIN ROOM
-  socket.on('joinRoom', ({ roomCode, playerId, playerName }) => {
+  socket.on('joinRoom', ({ roomCode, playerId, playerName, avatar }) => {
     const code = (roomCode || '').toUpperCase().trim();
     const pId = playerId || socket.id;
     const room = rooms.get(code);
@@ -156,7 +156,7 @@ io.on('connection', (socket) => {
       return socket.emit('roomError', `Table "${code}" not found. Please verify the 5-letter code.`);
     }
 
-    const res = room.addPlayer(pId, playerName, false, socket.id);
+    const res = room.addPlayer(pId, playerName, false, socket.id, avatar);
     if (!res.success) {
       return socket.emit('roomError', res.message);
     }

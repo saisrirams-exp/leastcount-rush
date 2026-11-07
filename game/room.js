@@ -7,7 +7,7 @@ const {
 } = require('./deck');
 
 class GameRoom {
-  constructor(code, hostId, hostName, settings = {}) {
+  constructor(code, hostId, hostName, settings = {}, hostAvatar = null) {
     this.code = code;
     this.hostId = hostId;
     this.createdAt = Date.now();
@@ -16,6 +16,7 @@ class GameRoom {
     this.maxPlayers = Math.min(15, Math.max(6, parseInt(settings.maxPlayers, 10) || 10));
     this.eliminationScore = parseInt(settings.eliminationScore, 10) || 150; // 100, 150, or 200
     this.turnDuration = parseInt(settings.turnDuration, 10) || 12; // in seconds (e.g. 10, 12, 15)
+    this.faceCardScoring = settings.faceCardScoring || 'STANDARD_10'; // 'STANDARD_10' (10, J, Q, K = 10 pts) | 'CLASSIC_13' (J=11, Q=12, K=13)
     this.handSize = 5; // Standard 5 cards
 
     // Room State
@@ -37,16 +38,17 @@ class GameRoom {
     this.deckCountUsed = getDeckCountForPlayerCapacity(this.maxPlayers);
 
     // Initial Host Player
-    this.addPlayer(hostId, hostName, false);
+    this.addPlayer(hostId, hostName, false, null, hostAvatar || '👑');
   }
 
-  addPlayer(id, name, isBot = false, socketId = null) {
+  addPlayer(id, name, isBot = false, socketId = null, avatar = null) {
     // 1. Reconnection check (player with same ID already in room)
     const existing = this.players.find(p => p.id === id);
     if (existing) {
       existing.connected = true;
       existing.socketId = socketId;
       if (name && !existing.isBot) existing.name = name.trim();
+      if (avatar) existing.avatar = avatar;
       return { success: true, player: existing, reconnected: true };
     }
 
@@ -55,10 +57,14 @@ class GameRoom {
       return { success: false, message: `Table is full (max ${this.maxPlayers} players)` };
     }
 
+    const defaultAvatars = ['🦁', '🐯', '🦊', '🐼', '⚡', '💎', '🚀', '🃏', '🥷', '🐺', '🔥'];
+    const chosenAvatar = avatar || (isBot ? '🤖' : (id === this.hostId ? '👑' : defaultAvatars[this.players.length % defaultAvatars.length]));
+
     const player = {
       id,
       socketId,
       name: name.trim() || (isBot ? `Bot_${Math.floor(100 + Math.random() * 900)}` : 'Player'),
+      avatar: chosenAvatar,
       isBot,
       connected: true,
       score: 0,
@@ -194,13 +200,13 @@ class GameRoom {
 
     // Build shoe based on player capacity
     this.deckCountUsed = getDeckCountForPlayerCapacity(this.maxPlayers);
-    this.drawPile = createShoe(this.deckCountUsed, true);
+    this.drawPile = createShoe(this.deckCountUsed, true, this.faceCardScoring);
     this.discardPile = [];
 
     // Cut one card to be the Wild Joker for this round
     this.wildJokerCard = this.drawPile.pop();
     this.wildJokerRank = this.wildJokerCard.isJoker ? 'A' : this.wildJokerCard.rank;
-    applyWildJokerToCard(this.wildJokerCard, this.wildJokerRank);
+    applyWildJokerToCard(this.wildJokerCard, this.wildJokerRank, this.faceCardScoring);
 
     // Deal 5 cards to each active player
     const activePlayers = this.getActivePlayers();
@@ -208,7 +214,7 @@ class GameRoom {
       for (const p of activePlayers) {
         if (this.drawPile.length > 0) {
           const card = this.drawPile.pop();
-          applyWildJokerToCard(card, this.wildJokerRank);
+          applyWildJokerToCard(card, this.wildJokerRank, this.faceCardScoring);
           p.hand.push(card);
         }
       }
@@ -217,7 +223,7 @@ class GameRoom {
     // Flip the first card to discard pile
     if (this.drawPile.length > 0) {
       const firstDiscard = this.drawPile.pop();
-      applyWildJokerToCard(firstDiscard, this.wildJokerRank);
+      applyWildJokerToCard(firstDiscard, this.wildJokerRank, this.faceCardScoring);
       this.discardPile.push(firstDiscard);
     }
 
@@ -430,7 +436,7 @@ class GameRoom {
     }
 
     if (drawnCard) {
-      applyWildJokerToCard(drawnCard, this.wildJokerRank);
+      applyWildJokerToCard(drawnCard, this.wildJokerRank, this.faceCardScoring);
     }
 
     // Remove dropped cards from hand
@@ -493,7 +499,7 @@ class GameRoom {
     }
 
     if (drawnCard) {
-      applyWildJokerToCard(drawnCard, this.wildJokerRank);
+      applyWildJokerToCard(drawnCard, this.wildJokerRank, this.faceCardScoring);
     }
 
     currentPlayer.hand.push(drawnCard);
@@ -778,6 +784,7 @@ class GameRoom {
       maxPlayers: this.maxPlayers,
       eliminationScore: this.eliminationScore,
       turnDuration: this.turnDuration,
+      faceCardScoring: this.faceCardScoring,
       deckCountUsed: this.deckCountUsed,
       wildJokerCard: this.wildJokerCard,
       wildJokerRank: this.wildJokerRank,
@@ -793,6 +800,7 @@ class GameRoom {
       players: this.players.map(p => ({
         id: p.id,
         name: p.name,
+        avatar: p.avatar || (p.isBot ? '🤖' : (p.id === this.hostId ? '👑' : '👤')),
         isBot: p.isBot,
         score: p.score,
         connected: p.connected !== false,

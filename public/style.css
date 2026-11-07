@@ -1647,3 +1647,90 @@ header.app-bar {
   from { opacity: 0; transform: translate(-50%, -10px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* Avatar Selector Grid */
+.avatar-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(245, 197, 66, 0.2);
+  border-radius: 14px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.avatar-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  user-select: none;
+}
+
+.avatar-opt:hover {
+  background: rgba(245, 197, 66, 0.15);
+  transform: translateY(-2px);
+}
+
+.avatar-opt.active {
+  background: rgba(245, 197, 66, 0.28);
+  border: 1.5px solid var(--gold);
+  transform: scale(1.08);
+  box-shadow: 0 0 10px rgba(245, 197, 66, 0.4);
+}
+
+/* Header Rules Button */
+.btn-rules {
+  background: rgba(245, 197, 66, 0.15);
+  color: var(--gold);
+  border: 1px solid rgba(245, 197, 66, 0.4);
+  font-weight: 700;
+}
+
+.btn-rules:hover {
+  background: rgba(245, 197, 66, 0.3);
+}
+
+/* Rules Modal Styling */
+.rule-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(245, 197, 66, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.rule-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.rule-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.chip-pts {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.chip-pts.gold { background: rgba(245, 197, 66, 0.25); color: var(--gold); }
+.chip-pts.green { background: rgba(46, 204, 113, 0.25); color: #2ecc71; }
+.chip-pts.blue { background: rgba(52, 152, 219, 0.25); color: #3498db; }
+.chip-pts.red { background: rgba(239, 35, 60, 0.25); color: #ef233c; }
