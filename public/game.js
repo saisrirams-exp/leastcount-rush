@@ -158,6 +158,9 @@ const menuExitBtn = document.getElementById('menuExitBtn');
 const menuTableCodeLabel = document.getElementById('menuTableCodeLabel');
 const rotateDevicePrompt = document.getElementById('rotateDevicePrompt');
 const dismissRotatePromptBtn = document.getElementById('dismissRotatePromptBtn');
+const landscapeShieldOverlay = document.getElementById('landscapeShieldOverlay');
+const forceRotateLandscapeBtn = document.getElementById('forceRotateLandscapeBtn');
+const hudRotateBtn = document.getElementById('hudRotateBtn');
 
 // In-Game Elements (Left: Deck & Joker | Middle: Dotted Drop Box | Right: Discard Stack)
 const arenaStadium = document.getElementById('arenaStadium');
@@ -456,39 +459,86 @@ socket.on('leftRoom', () => {
   gameState = null;
   selectedCards.clear();
   stagedCards = [];
+  isForceRotated = false;
   
   if (topAppBar) topAppBar.style.display = 'flex';
   roomBadge.style.display = 'none';
   lobbyScreen.style.display = 'none';
   gameScreen.style.display = 'none';
+  if (gameScreen) gameScreen.classList.remove('force-landscape-rotated');
   resultsModal.style.display = 'none';
   if (gameMenuModal) gameMenuModal.style.display = 'none';
   if (rotateDevicePrompt) rotateDevicePrompt.style.display = 'none';
+  if (landscapeShieldOverlay) landscapeShieldOverlay.style.display = 'none';
   homeScreen.style.display = 'flex';
 
   // Clean URL query
   window.history.replaceState(null, '', window.location.pathname);
 });
 
-// Mobile Orientation & Fullscreen Helper
-let rotatePromptDismissed = false;
+// Horizontal Landscape Orientation Enforcer
+let isForceRotated = false;
+
 function checkOrientationHelper() {
-  if (!rotateDevicePrompt) return;
   const isGameVisible = gameScreen && gameScreen.style.display !== 'none';
-  const isPortrait = window.innerHeight > window.innerWidth;
-  if (isGameVisible && isPortrait && !rotatePromptDismissed && window.innerWidth <= 768) {
-    rotateDevicePrompt.style.display = 'flex';
+  const isPortrait = !isForceRotated && (window.innerHeight > window.innerWidth);
+
+  if (isGameVisible && isPortrait) {
+    if (landscapeShieldOverlay) landscapeShieldOverlay.style.display = 'flex';
   } else {
-    rotateDevicePrompt.style.display = 'none';
+    if (landscapeShieldOverlay) landscapeShieldOverlay.style.display = 'none';
+  }
+
+  // If user rotated phone to landscape naturally, reset forced rotation
+  if (window.innerWidth >= window.innerHeight && isForceRotated) {
+    isForceRotated = false;
+    if (gameScreen) gameScreen.classList.remove('force-landscape-rotated');
+    if (resultsModal) resultsModal.classList.remove('force-landscape-rotated');
+    if (gameMenuModal) gameMenuModal.classList.remove('force-landscape-rotated');
   }
 }
 
-if (dismissRotatePromptBtn) {
-  dismissRotatePromptBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    rotatePromptDismissed = true;
-    if (rotateDevicePrompt) rotateDevicePrompt.style.display = 'none';
-  });
+function toggleForceLandscape() {
+  isForceRotated = !isForceRotated;
+  if (isForceRotated) {
+    if (gameScreen) gameScreen.classList.add('force-landscape-rotated');
+    if (resultsModal) resultsModal.classList.add('force-landscape-rotated');
+    if (gameMenuModal) gameMenuModal.classList.add('force-landscape-rotated');
+    if (landscapeShieldOverlay) landscapeShieldOverlay.style.display = 'none';
+    triggerHaptic('tap');
+
+    // Attempt OS Fullscreen and Landscape Orientation Lock
+    try {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().then(() => {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
+        }).catch(() => {});
+      } else if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    } catch (e) {}
+  } else {
+    if (gameScreen) gameScreen.classList.remove('force-landscape-rotated');
+    if (resultsModal) resultsModal.classList.remove('force-landscape-rotated');
+    if (gameMenuModal) gameMenuModal.classList.remove('force-landscape-rotated');
+    checkOrientationHelper();
+  }
+
+  // Re-render opponents for horizontal layout
+  if (gameState && gameState.players) {
+    const opponents = gameState.players.filter(p => p.id !== myPlayerId);
+    renderOpponents(opponents, gameState.currentTurnPlayerId);
+  }
+}
+
+if (forceRotateLandscapeBtn) {
+  forceRotateLandscapeBtn.addEventListener('click', toggleForceLandscape);
+}
+
+if (hudRotateBtn) {
+  hudRotateBtn.addEventListener('click', toggleForceLandscape);
 }
 
 window.addEventListener('resize', () => {
@@ -567,6 +617,11 @@ fillBotsBtn.addEventListener('click', () => {
 });
 
 startGameBtn.addEventListener('click', () => {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
+  } catch (e) {}
   socket.emit('startGame');
 });
 
@@ -801,7 +856,7 @@ if (sortCardsBtn) {
 // -----------------------------------------------------------------------------
 function declareShow() {
   const myPlayer = gameState?.players.find(p => p.id === myPlayerId);
-  const myScore = myPlayer?.handScore || 0;
+  const myScore = myPlayer ? calculateHandScore(myPlayer.hand) : 0;
 
   if (myScore > 10) {
     showToast('⚠️ You can only call SHOW when your hand total is 10 or below!');
@@ -810,6 +865,10 @@ function declareShow() {
 
   const confirmMsg = `Declare SHOW with ${myScore} points?\n\nIf you have the lowest hand at the table, you score 0!\nIf anyone ties or beats you, you take a +40 penalty!`;
   if (confirm(confirmMsg)) {
+    if (stagedCards.length > 0) {
+      stagedCards = [];
+      updateHandUI();
+    }
     socket.emit('callShow');
   }
 }
@@ -1036,7 +1095,7 @@ function renderOpponents(opponents, currentTurnPlayerId) {
   if (!opponents || opponents.length === 0) return;
 
   const total = opponents.length;
-  const isPortrait = window.innerHeight > window.innerWidth;
+  const isHorizontal = isForceRotated || (window.innerWidth >= window.innerHeight);
 
   opponents.forEach((p, idx) => {
     const isCurrentTurn = p.id === currentTurnPlayerId;
@@ -1044,15 +1103,32 @@ function renderOpponents(opponents, currentTurnPlayerId) {
     const avatarEmoji = p.eliminated ? '💀' : (p.isBot ? '🤖' : (p.avatar || '👤'));
     const countDisplay = p.eliminated ? '💀' : (p.waitingNextRound ? '👁️' : (p.cardCount !== undefined ? p.cardCount : 7));
 
-    if (!isPortrait) {
-      // LANDSCAPE MODE: Wide Elliptical Perimeter
+    if (isHorizontal) {
+      // LANDSCAPE HORIZONTAL MODE: Wide Perimeter Arc (Matching Play Store 2000x1200 landscape layout)
+      let slotClass = 'slot-top-center';
+      if (total === 1) {
+        slotClass = 'slot-top-center';
+      } else if (total === 2) {
+        const map2 = ['slot-top-left', 'slot-top-right'];
+        slotClass = map2[idx] || 'slot-top-center';
+      } else if (total === 3) {
+        const map3 = ['slot-left', 'slot-top-center', 'slot-right'];
+        slotClass = map3[idx] || 'slot-top-center';
+      } else if (total === 4) {
+        const map4 = ['slot-left', 'slot-top-left', 'slot-top-right', 'slot-right'];
+        slotClass = map4[idx] || 'slot-top-center';
+      } else if (total === 5) {
+        const map5 = ['slot-left', 'slot-top-left', 'slot-top-center', 'slot-top-right', 'slot-right'];
+        slotClass = map5[idx] || 'slot-top-center';
+      }
+
       if (total <= 5) {
-        const slotClasses = ['slot-left', 'slot-top-left', 'slot-top-center', 'slot-top-right', 'slot-right'];
-        slotDiv.className = `opponent-slot ${slotClasses[idx] || 'slot-top-center'} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+        slotDiv.className = `opponent-slot ${slotClass} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
       } else {
+        // 6 to 14 opponents: Wide Elliptical Perimeter Arc
         const angle = Math.PI - (idx / (total - 1)) * Math.PI;
         const leftPct = 50 - 44 * Math.cos(angle);
-        const topPct = 36 - 26 * Math.sin(angle);
+        const topPct = 34 - 24 * Math.sin(angle);
         slotDiv.className = `opponent-slot ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
         slotDiv.style.left = `${leftPct}%`;
         slotDiv.style.top = `${topPct}%`;

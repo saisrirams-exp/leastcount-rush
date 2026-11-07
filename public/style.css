@@ -538,7 +538,134 @@ header.app-bar {
   z-index: 60;
 }
 
-/* 3D Gold Playing Card Corner Accents (Hidden on mobile/portrait to avoid UI overlapping) */
+/* =======================================================
+   LANDSCAPE ORIENTATION ENFORCER (Horizontal Table Game)
+   ======================================================= */
+.landscape-shield-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background: radial-gradient(circle at 50% 50%, #2a0b47 0%, #10031c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+  box-sizing: border-box;
+  text-align: center;
+  color: #ffffff;
+}
+
+@media (orientation: landscape) {
+  .landscape-shield-overlay {
+    display: none !important;
+  }
+}
+
+.landscape-shield-box {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1.5px solid rgba(245, 197, 66, 0.4);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+  border-radius: 22px;
+  padding: 28px 24px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  backdrop-filter: blur(12px);
+}
+
+.phone-rotate-anim {
+  animation: phoneRotateSpin 2.6s infinite ease-in-out;
+}
+
+@keyframes phoneRotateSpin {
+  0% { transform: rotate(0deg); }
+  35% { transform: rotate(-90deg); }
+  65% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.landscape-shield-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--gold);
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.landscape-shield-desc {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(253, 250, 243, 0.85);
+  margin: 0;
+}
+
+.btn-force-landscape {
+  background: linear-gradient(135deg, #f5c542 0%, #c48b0a 100%);
+  color: #120320;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(245, 197, 66, 0.45);
+  transition: transform 0.15s, box-shadow 0.15s;
+  margin-top: 4px;
+}
+
+.btn-force-landscape:hover {
+  transform: scale(1.04);
+  box-shadow: 0 6px 22px rgba(245, 197, 66, 0.65);
+}
+
+.btn-force-landscape:active {
+  transform: scale(0.96);
+}
+
+/* Force 90-degree CSS Landscape Rotation when user chooses to play horizontally on a portrait device */
+.game-arena-fullscreen.force-landscape-rotated {
+  width: 100dvh !important;
+  height: 100dvw !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 100vw !important;
+  transform-origin: top left !important;
+  transform: rotate(90deg) !important;
+  overflow: hidden !important;
+}
+
+.game-arena-fullscreen.force-landscape-rotated .landscape-shield-overlay {
+  display: none !important;
+}
+
+.modal-overlay.force-landscape-rotated {
+  width: 100dvh !important;
+  height: 100dvw !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 100vw !important;
+  transform-origin: top left !important;
+  transform: rotate(90deg) !important;
+  overflow: hidden !important;
+  z-index: 100 !important;
+}
+
+.hud-rotate-btn {
+  font-size: 15px;
+  background: rgba(245, 197, 66, 0.2);
+  border: 1px solid var(--gold);
+}
+.hud-rotate-btn:hover {
+  background: var(--gold);
+  color: #120320;
+}
+
+/* 3D Gold Playing Card Corner Accents */
 .table-corner-card.corner-top-left {
   position: absolute;
   top: -30px;
@@ -582,11 +709,24 @@ header.app-bar {
   opacity: 0.85;
 }
 
-@media (max-width: 768px), (orientation: portrait) {
-  .table-corner-card,
-  .table-corner-heart,
-  .table-corner-fan {
-    display: none !important;
+@media (max-height: 480px) and (orientation: landscape) {
+  .table-corner-card.corner-top-left {
+    width: 90px;
+    height: 130px;
+    top: -24px;
+    left: -15px;
+  }
+  .table-corner-heart.corner-top-right {
+    width: 34px;
+    height: 34px;
+    top: 10px;
+    right: 18px;
+  }
+  .table-corner-fan.corner-bottom-right {
+    width: 105px;
+    height: 140px;
+    bottom: -30px;
+    right: -20px;
   }
 }
 
@@ -901,7 +1041,7 @@ header.app-bar {
 /* LEFT: Draw Deck overlapping on top of Wild Joker */
 .draw-pile-group {
   position: relative;
-  width: 104px;
+  width: 118px;
   height: 122px;
   flex-shrink: 0;
 }
@@ -914,12 +1054,14 @@ header.app-bar {
   height: 112px !important;
   z-index: 1 !important;
   pointer-events: none;
+  transform: rotate(-6deg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 .draw-deck-card {
   position: absolute !important;
-  left: 22px !important;
-  top: 8px !important;
+  left: 36px !important;
+  top: 6px !important;
   width: 78px !important;
   height: 112px !important;
   border-radius: 9px;
@@ -1959,7 +2101,7 @@ header.app-bar {
   }
 
   .draw-pile-group {
-    width: 78px;
+    width: 86px;
     height: 94px;
     position: relative;
     flex-shrink: 0;
@@ -1972,12 +2114,13 @@ header.app-bar {
     width: 58px !important;
     height: 84px !important;
     z-index: 1 !important;
+    transform: rotate(-5deg);
   }
 
   .draw-deck-card {
     position: absolute !important;
-    left: 18px !important;
-    top: 6px !important;
+    left: 26px !important;
+    top: 4px !important;
     width: 58px !important;
     height: 84px !important;
     z-index: 2 !important;
