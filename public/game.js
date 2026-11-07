@@ -37,8 +37,55 @@ const roomBadge = document.getElementById('roomBadge');
 const roomBadgeCode = document.getElementById('roomBadgeCode');
 const copyInviteBtn = document.getElementById('copyInviteBtn');
 const copyInviteLinkBtn = document.getElementById('copyInviteLinkBtn');
+const shareInviteBtn = document.getElementById('shareInviteBtn');
 const exitTableBtn = document.getElementById('exitTableBtn');
 const adminStopGameBtn = document.getElementById('adminStopGameBtn');
+const gameToast = document.getElementById('gameToast');
+
+let toastTimer = null;
+function showToast(msg, duration = 2400) {
+  if (!gameToast) return;
+  gameToast.innerText = msg;
+  gameToast.style.display = 'block';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    gameToast.style.display = 'none';
+  }, duration);
+}
+
+// Global Hand Auto-Sort Preference (defaults to true)
+let isAutoSortEnabled = localStorage.getItem('leastcount_autosort') !== 'false';
+
+function sortCardsArray(cards, ascending = true) {
+  if (!cards || !Array.isArray(cards)) return cards;
+
+  const suitOrder = { '♣': 1, '♦': 2, '♥': 3, '♠': 4, '?': 5 };
+  const getRankVal = (r) => {
+    if (r === 'JOKER') return 0;
+    if (r === 'A') return 1;
+    if (r === 'J') return 11;
+    if (r === 'Q') return 12;
+    if (r === 'K') return 13;
+    return parseInt(r, 10) || 0;
+  };
+
+  return cards.sort((a, b) => {
+    // 1. Points (Jokers/Wild = 0 first, Aces = 1, ..., Kings = 13)
+    const pA = (a.isWild || a.isJoker) ? 0 : (a.points !== undefined ? a.points : getRankVal(a.rank));
+    const pB = (b.isWild || b.isJoker) ? 0 : (b.points !== undefined ? b.points : getRankVal(b.rank));
+    if (pA !== pB) {
+      return ascending ? pA - pB : pB - pA;
+    }
+    // 2. Rank numerical order
+    const rvA = getRankVal(a.rank);
+    const rvB = getRankVal(b.rank);
+    if (rvA !== rvB) {
+      return ascending ? rvA - rvB : rvB - rvA;
+    }
+    // 3. Group by suit
+    return (suitOrder[a.suit] || 0) - (suitOrder[b.suit] || 0);
+  });
+}
 
 const playerNameInput = document.getElementById('playerNameInput');
 const joinCodeInput = document.getElementById('joinCodeInput');
@@ -204,18 +251,45 @@ cancelCreateModalBtn.addEventListener('click', () => {
   createTableModal.style.display = 'none';
 });
 
+if (joinCodeInput) {
+  joinCodeInput.addEventListener('input', (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  });
+}
+
 function copyInvite() {
   if (!currentRoomCode) return;
   const link = `${window.location.origin}/?room=${currentRoomCode}`;
-  navigator.clipboard.writeText(link).then(() => {
-    alert(`Invite link copied to clipboard!\n${link}`);
-  }).catch(() => {
-    alert(`Share this room code with friends: ${currentRoomCode}`);
-  });
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(() => {
+      showToast(`📋 Table link copied: ${link}`);
+    }).catch(() => {
+      prompt('Copy invite link:', link);
+    });
+  } else {
+    prompt('Copy invite link:', link);
+  }
 }
 
 copyInviteBtn.addEventListener('click', copyInvite);
 copyInviteLinkBtn.addEventListener('click', copyInvite);
+
+if (shareInviteBtn) {
+  shareInviteBtn.addEventListener('click', () => {
+    if (!currentRoomCode) return;
+    const link = `${window.location.origin}/?room=${currentRoomCode}`;
+    const shareData = {
+      title: 'Least Count Rush',
+      text: `🃏 Join my Least Count card table! Table Code: ${currentRoomCode}`,
+      url: link
+    };
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      navigator.share(shareData).catch(() => copyInvite());
+    } else {
+      copyInvite();
+    }
+  });
+}
 
 // Exit Table Option
 exitTableBtn.addEventListener('click', () => {
@@ -314,7 +388,24 @@ nextRoundBtn.addEventListener('click', () => {
 // CARD INTERACTION: SELECTION & DRAG-AND-DROP INTO MIDDLE DOTTED BOX
 // -----------------------------------------------------------------------------
 function toggleCardSelection(cardId) {
+  if (!gameState) return;
+  const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
+  const isDropPhase = isMyTurn && gameState.turnPhase === 'DROP';
+
+  // If a card is ALREADY staged in the middle box:
+  // Tapping another card in hand allows instant swapping!
+  if (stagedCards.length > 0 && isDropPhase) {
+    stageCardsInMiddle([cardId]);
+    showToast('Swapped card in drop zone 🔄');
+    return;
+  }
+
   if (selectedCards.has(cardId)) {
+    // If tapping an already selected card on drop turn: stage it into middle box!
+    if (isDropPhase) {
+      stageCardsInMiddle(Array.from(selectedCards));
+      return;
+    }
     selectedCards.delete(cardId);
   } else {
     // If selecting multiple cards, ensure they have the same rank!
@@ -359,7 +450,7 @@ function stageCardsInMiddle(cardIdsToStage) {
   const firstIsWild = cards[0].isWild;
   const allMatch = cards.every(c => c.rank === firstRank || (c.isWild && firstIsWild));
   if (!allMatch) {
-    alert('Multiple cards dropped must have the same rank!');
+    showToast('⚠️ Multiple cards dropped must have the same rank!');
     return;
   }
 
@@ -369,6 +460,7 @@ function stageCardsInMiddle(cardIdsToStage) {
 
   updateHandUI();
   updateActionUI();
+  showToast('Card in drop zone! Tap Left Deck or Right Discard to draw 🂠');
 }
 
 function unstageCards() {
@@ -379,6 +471,7 @@ function unstageCards() {
 
   updateHandUI();
   updateActionUI();
+  showToast('Card returned to hand ↩️');
 }
 
 // Click on middle dotted box:
@@ -393,6 +486,8 @@ middleDottedDropBox.addEventListener('click', () => {
     unstageCards();
   } else if (selectedCards.size > 0) {
     stageCardsInMiddle(Array.from(selectedCards));
+  } else {
+    showToast('Select or drag a card from your hand into this box first');
   }
 });
 
@@ -455,7 +550,7 @@ drawPileBtn.addEventListener('click', () => {
     socket.emit('drawCard', { source: 'DECK' });
     window.soundFx.playCardDraw();
   } else {
-    alert('👉 Place your card(s) into the Middle Box first before drawing!');
+    showToast('👉 Place your card into the Middle Drop Box first!');
   }
 });
 
@@ -484,7 +579,7 @@ discardStackPile.addEventListener('click', () => {
         return;
       }
     }
-    alert('👉 Place your card(s) into the Middle Box first before drawing!');
+    showToast('👉 Place your card into the Middle Drop Box first!');
   }
 });
 
@@ -499,7 +594,7 @@ function executeSlash() {
   const targetRank = gameState.topDiscard.rank;
   const matchingCards = myPlayer.hand.filter(c => c.rank === targetRank || (c.isWild && gameState.topDiscard.isWild));
   if (matchingCards.length === 0) {
-    alert(`No card in your hand matches the top discard (${targetRank}) to slash.`);
+    showToast(`No card in your hand matches the top discard (${targetRank}) to slash.`);
     return;
   }
 
@@ -508,6 +603,7 @@ function executeSlash() {
   selectedCards.clear();
   socket.emit('slashCards', { cardIds });
   window.soundFx.playSlash();
+  showToast(`⚡ SLASHED ${targetRank}! Dropped without drawing!`);
 }
 
 slashBtn.addEventListener('click', executeSlash);
@@ -516,36 +612,15 @@ slashBtn.addEventListener('click', executeSlash);
 // AUTO-SORT HAND (ASCENDING ORDER)
 // -----------------------------------------------------------------------------
 function sortMyHand(ascending = true) {
+  isAutoSortEnabled = true;
+  localStorage.setItem('leastcount_autosort', 'true');
   if (!gameState) return;
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
   if (!myPlayer || !myPlayer.hand) return;
 
-  const suitOrder = { '♣': 1, '♦': 2, '♥': 3, '♠': 4, '?': 5 };
-  const getRankVal = (r) => {
-    if (r === 'JOKER') return 0;
-    if (r === 'A') return 1;
-    if (r === 'J') return 11;
-    if (r === 'Q') return 12;
-    if (r === 'K') return 13;
-    return parseInt(r, 10) || 0;
-  };
-
-  myPlayer.hand.sort((a, b) => {
-    // 1. Points (Jokers/Wild = 0 first, Aces = 1, ..., Kings = 13)
-    if (a.points !== b.points) {
-      return ascending ? a.points - b.points : b.points - a.points;
-    }
-    // 2. Rank numerical order
-    const rvA = getRankVal(a.rank);
-    const rvB = getRankVal(b.rank);
-    if (rvA !== rvB) {
-      return ascending ? rvA - rvB : rvB - rvA;
-    }
-    // 3. Group by suit
-    return (suitOrder[a.suit] || 0) - (suitOrder[b.suit] || 0);
-  });
-
+  sortCardsArray(myPlayer.hand, ascending);
   window.soundFx.playCardDraw();
+  showToast('🃏 Hand sorted in ascending order (0 ➔ K)');
   updateHandUI();
 }
 
@@ -642,6 +717,12 @@ function renderGameState(state) {
   gameState = state;
   myPlayerId = persistentPlayerId;
   isHost = state.hostId === persistentPlayerId;
+
+  // Auto-sort hand in ascending order (0 pts Wilds/Jokers ➔ A ➔ 2-10 ➔ J, Q, K)
+  const myPlayer = state.players.find(p => p.id === myPlayerId);
+  if (myPlayer && myPlayer.hand && isAutoSortEnabled) {
+    sortCardsArray(myPlayer.hand, true);
+  }
 
   // Header controls
   adminStopGameBtn.style.display = isHost && state.status === 'PLAYING' ? 'inline-block' : 'none';
@@ -843,6 +924,10 @@ function updateHandUI() {
   if (!gameState) return;
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
   if (!myPlayer) return;
+
+  if (myPlayer.hand && isAutoSortEnabled) {
+    sortCardsArray(myPlayer.hand, true);
+  }
 
   if (myPlayer.waitingNextRound) {
     myHandCards.innerHTML = `

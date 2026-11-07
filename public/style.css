@@ -1595,4 +1595,55 @@ header.app-bar {
   .table-side-column {
     gap: 6px;
   }
+
+  .app-bar {
+    padding: 0 6px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+  }
+
+  .brand {
+    gap: 4px;
+  }
+
+  .brand .logo-icon {
+    font-size: 17px;
+  }
+
+  .brand h1.brand-title {
+    font-size: 12px;
+  }
+
+  .header-action-btn {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+}
+
+/* Floating Game Toast for Non-Blocking Notifications */
+.game-toast {
+  position: fixed;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 31, 23, 0.96);
+  border: 1.5px solid var(--gold);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  z-index: 99999;
+  pointer-events: none;
+  animation: toastFadeIn 0.25s ease-out;
+  text-align: center;
+  max-width: 90vw;
+  white-space: nowrap;
+}
+
+@keyframes toastFadeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }

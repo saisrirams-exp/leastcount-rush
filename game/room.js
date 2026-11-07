@@ -662,9 +662,9 @@ class GameRoom {
     const total = this.players.length;
     let nextIdx = (this.currentTurnIndex + 1) % total;
 
-    // Skip eliminated players
+    // Skip eliminated players and players waiting for next round (spectators)
     let attempts = 0;
-    while (this.players[nextIdx].eliminated && attempts < total) {
+    while ((this.players[nextIdx].eliminated || this.players[nextIdx].waitingNextRound) && attempts < total) {
       nextIdx = (nextIdx + 1) % total;
       attempts++;
     }
@@ -678,14 +678,19 @@ class GameRoom {
    */
   autoPlayCurrentTurn() {
     const player = this.getCurrentPlayer();
-    if (!player) return;
+    if (!player || player.eliminated || player.waitingNextRound) {
+      this.advanceTurn();
+      return;
+    }
 
     if (this.turnPhase === 'DROP') {
-      // Find highest card(s) and drop
-      const sortedHand = [...player.hand].sort((a, b) => b.points - a.points);
+      // Find highest point card(s) and drop
+      const sortedHand = [...player.hand].sort((a, b) => (b.points || 0) - (a.points || 0));
       const cardToDrop = sortedHand[0];
       if (cardToDrop) {
         this.handleDropAndDraw(player.id, [cardToDrop.id], 'DECK');
+      } else {
+        this.advanceTurn();
       }
     } else if (this.turnPhase === 'DRAW') {
       this.handleDraw(player.id, 'DECK');

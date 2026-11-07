@@ -59,32 +59,50 @@ setInterval(() => {
         if (!room.botMoving) {
           room.botMoving = true;
           setTimeout(() => {
-            if (room.status === 'PLAYING' && room.getCurrentPlayer()?.id === currentPlayer.id) {
-              const move = room.decideBotMove(currentPlayer);
-              if (move) {
-                if (move.action === 'SHOW') {
-                  room.handleCallShow(currentPlayer.id);
-                } else if (move.action === 'DROP') {
-                  room.handleDrop(currentPlayer.id, move.cardIds);
-                  // Bot immediately decides draw after dropping
-                  setTimeout(() => {
-                    if (room.status === 'PLAYING' && room.getCurrentPlayer()?.id === currentPlayer.id) {
-                      const drawMove = room.decideBotMove(currentPlayer);
-                      if (drawMove && drawMove.action === 'DRAW') {
-                        room.handleDraw(currentPlayer.id, drawMove.source);
-                      }
-                      broadcastRoomState(room);
-                    }
+            try {
+              if (room.status === 'PLAYING' && room.getCurrentPlayer()?.id === currentPlayer.id) {
+                const move = room.decideBotMove(currentPlayer);
+                if (move) {
+                  if (move.action === 'SHOW') {
+                    room.handleCallShow(currentPlayer.id);
+                    broadcastRoomState(room);
                     room.botMoving = false;
-                  }, 600);
-                } else if (move.action === 'DRAW') {
-                  room.handleDraw(currentPlayer.id, move.source);
+                  } else if (move.action === 'DROP') {
+                    room.handleDrop(currentPlayer.id, move.cardIds);
+                    broadcastRoomState(room);
+                    // Bot decides draw after dropping
+                    setTimeout(() => {
+                      try {
+                        if (room.status === 'PLAYING' && room.getCurrentPlayer()?.id === currentPlayer.id) {
+                          const drawMove = room.decideBotMove(currentPlayer);
+                          if (drawMove && drawMove.action === 'DRAW') {
+                            room.handleDraw(currentPlayer.id, drawMove.source);
+                          }
+                          broadcastRoomState(room);
+                        }
+                      } finally {
+                        room.botMoving = false;
+                      }
+                    }, 600);
+                    return; // Retain room.botMoving = true until inner draw completes!
+                  } else if (move.action === 'DRAW') {
+                    room.handleDraw(currentPlayer.id, move.source);
+                    broadcastRoomState(room);
+                    room.botMoving = false;
+                  } else {
+                    room.botMoving = false;
+                  }
+                } else {
+                  room.botMoving = false;
                 }
+              } else {
+                room.botMoving = false;
               }
-              broadcastRoomState(room);
+            } catch (err) {
+              console.error('[Bot Error]', err);
+              room.botMoving = false;
             }
-            room.botMoving = false;
-          }, 1000);
+          }, 800);
         }
       } else {
         // Human Player Timer countdown

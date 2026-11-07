@@ -53,26 +53,29 @@
         <div id="inviteBlock" style="display:none;">
           <div style="background:rgba(245,197,66,0.12); border:1.5px solid var(--gold); border-radius:14px; padding:16px; margin-bottom:16px; text-align:center;">
             <div style="font-size:12px; font-weight:800; color:var(--gold); letter-spacing:1px; text-transform:uppercase;">You're Invited to Play!</div>
-            <div style="font-size:14px; color:rgba(253,250,243,0.85); margin-top:4px;">Table Code: <strong id="inviteCodeLabel" style="color:#fff; font-size:20px; letter-spacing:2px;"></strong></div>
+            <div style="font-size:14px; color:rgba(253,250,243,0.85); margin-top:4px;">Table Code: <strong id="inviteCodeLabel" style="color:#fff; font-size:22px; letter-spacing:2px;"></strong></div>
           </div>
-          <button id="inviteJoinBtn" class="btn-primary" style="margin-bottom:12px; font-size:17px;">🚀 Join Friends at Table</button>
+          <button id="inviteJoinBtn" class="btn-primary" style="margin-bottom:12px; font-size:16px;">🚀 Join Friends at Table</button>
           <div style="text-align:center; margin-top:10px;">
-            <span id="showNormalHomeBtn" style="font-size:12px; color:rgba(253,250,243,0.6); cursor:pointer; text-decoration:underline;">or create your own new table instead</span>
+            <span id="showNormalHomeBtn" style="font-size:12px; color:rgba(253,250,243,0.6); cursor:pointer; text-decoration:underline;">or enter another code / host a table</span>
           </div>
         </div>
 
         <!-- Standard Create / Join Block -->
         <div id="standardBlock">
-          <button id="openCreateModalBtn" class="btn-primary" style="margin-bottom:12px;">Create Table (6–15 Players)</button>
+          <div style="background: rgba(255,255,255,0.04); border: 1.5px solid rgba(245,197,66,0.3); border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+            <label style="font-size: 13px; font-weight: 700; color: var(--gold); display: block; margin-bottom: 6px;">Join Friends' Table</label>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <input type="text" id="joinCodeInput" class="text-input" placeholder="Enter 5-letter Room Code" style="text-transform:uppercase; text-align:center; letter-spacing:2.5px; font-size: 18px; font-weight: 800;">
+            </div>
+            <button id="joinRoomBtn" class="btn-primary" style="font-size: 15px;">🚀 Join Table</button>
+          </div>
 
           <div class="divider">
-            <span>or join with code</span>
+            <span>or host a table</span>
           </div>
 
-          <div class="form-group">
-            <input type="text" id="joinCodeInput" class="text-input" placeholder="Enter 5-letter Room Code" style="text-transform:uppercase; text-align:center; letter-spacing:2px;">
-          </div>
-          <button id="joinRoomBtn" class="btn-secondary">Join Table</button>
+          <button id="openCreateModalBtn" class="btn-secondary" style="border: 1.5px solid var(--gold); color: var(--gold); font-size: 14px;">👑 Host New Table (6–15 Players)</button>
         </div>
       </div>
     </section>
@@ -85,7 +88,10 @@
             <h2 class="lobby-title">Table <span id="lobbyRoomCode"></span></h2>
             <div id="lobbyCapacityLabel" class="lobby-subtitle"></div>
           </div>
-          <button id="copyInviteLinkBtn" class="btn-copy-invite">🔗 Copy Invite Link</button>
+          <div style="display:flex; gap:6px;">
+            <button id="copyInviteLinkBtn" class="btn-copy-invite">📋 Copy Code</button>
+            <button id="shareInviteBtn" class="btn-copy-invite" style="background:rgba(46,204,113,0.2); border-color:var(--success); color:#2ecc71;">📲 Share</button>
+          </div>
         </div>
 
         <div class="lobby-players-label">
@@ -329,6 +335,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Floating Game Toast for Non-Blocking Mobile Feedback -->
+  <div id="gameToast" class="game-toast" style="display:none;"></div>
 
   <script src="sound.js"></script>
   <script src="game.js"></script>
