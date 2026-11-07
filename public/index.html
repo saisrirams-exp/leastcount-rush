@@ -159,9 +159,10 @@
         </div>
       </div>
 
-      <!-- Turn Timer Floating Indicator -->
-      <div class="floating-timer-wrap">
-        <div id="timerCircle" class="table-timer-circle">12</div>
+      <!-- Orientation Helper Pill for Mobile Portrait -->
+      <div id="rotateDevicePrompt" class="rotate-device-prompt" style="display:none;">
+        <span>🔄 Rotate phone for Landscape Table</span>
+        <button id="dismissRotatePromptBtn" class="dismiss-rotate-btn" title="Dismiss">✕</button>
       </div>
 
       <!-- Opponents Sitting Around the Table Perimeter -->
@@ -171,6 +172,11 @@
 
       <!-- Center Table Hub: Wild Joker & Draw Deck (Left) | Dashed Drop Zone (Middle) | Discard Stack (Right) -->
       <div class="center-table-hub">
+
+        <!-- Turn Timer Floating Indicator (Anchored directly above middle drop zone) -->
+        <div class="floating-timer-wrap">
+          <div id="timerCircle" class="table-timer-circle">12</div>
+        </div>
 
         <!-- LEFT: Draw Deck sitting offset on top of Wild Joker Cut Card -->
         <div class="draw-pile-group">

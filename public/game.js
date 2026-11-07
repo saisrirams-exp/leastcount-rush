@@ -156,6 +156,8 @@ const menuCopyLinkBtn = document.getElementById('menuCopyLinkBtn');
 const menuAdminStopBtn = document.getElementById('menuAdminStopBtn');
 const menuExitBtn = document.getElementById('menuExitBtn');
 const menuTableCodeLabel = document.getElementById('menuTableCodeLabel');
+const rotateDevicePrompt = document.getElementById('rotateDevicePrompt');
+const dismissRotatePromptBtn = document.getElementById('dismissRotatePromptBtn');
 
 // In-Game Elements (Left: Deck & Joker | Middle: Dotted Drop Box | Right: Discard Stack)
 const arenaStadium = document.getElementById('arenaStadium');
@@ -461,10 +463,50 @@ socket.on('leftRoom', () => {
   gameScreen.style.display = 'none';
   resultsModal.style.display = 'none';
   if (gameMenuModal) gameMenuModal.style.display = 'none';
+  if (rotateDevicePrompt) rotateDevicePrompt.style.display = 'none';
   homeScreen.style.display = 'flex';
 
   // Clean URL query
   window.history.replaceState(null, '', window.location.pathname);
+});
+
+// Mobile Orientation & Fullscreen Helper
+let rotatePromptDismissed = false;
+function checkOrientationHelper() {
+  if (!rotateDevicePrompt) return;
+  const isGameVisible = gameScreen && gameScreen.style.display !== 'none';
+  const isPortrait = window.innerHeight > window.innerWidth;
+  if (isGameVisible && isPortrait && !rotatePromptDismissed && window.innerWidth <= 768) {
+    rotateDevicePrompt.style.display = 'flex';
+  } else {
+    rotateDevicePrompt.style.display = 'none';
+  }
+}
+
+if (dismissRotatePromptBtn) {
+  dismissRotatePromptBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    rotatePromptDismissed = true;
+    if (rotateDevicePrompt) rotateDevicePrompt.style.display = 'none';
+  });
+}
+
+window.addEventListener('resize', () => {
+  checkOrientationHelper();
+  if (gameState && gameState.players && gameScreen && gameScreen.style.display !== 'none') {
+    const opponents = gameState.players.filter(p => p.id !== myPlayerId);
+    renderOpponents(opponents, gameState.currentTurnPlayerId);
+  }
+});
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    checkOrientationHelper();
+    if (gameState && gameState.players && gameScreen && gameScreen.style.display !== 'none') {
+      const opponents = gameState.players.filter(p => p.id !== myPlayerId);
+      renderOpponents(opponents, gameState.currentTurnPlayerId);
+    }
+  }, 150);
 });
 
 // -----------------------------------------------------------------------------
@@ -864,6 +906,7 @@ function renderGameState(state) {
     gameScreen.style.display = 'none';
     lobbyScreen.style.display = 'flex';
     resultsModal.style.display = 'none';
+    if (rotateDevicePrompt) rotateDevicePrompt.style.display = 'none';
 
     renderLobby(state);
   } else if (state.status === 'PLAYING') {
@@ -872,10 +915,12 @@ function renderGameState(state) {
     lobbyScreen.style.display = 'none';
     gameScreen.style.display = 'flex';
     resultsModal.style.display = 'none';
+    checkOrientationHelper();
 
     renderGameTable(state);
   } else if (state.status === 'ROUND_OVER' || state.status === 'GAME_OVER') {
     if (topAppBar) topAppBar.style.display = 'none';
+    if (rotateDevicePrompt) rotateDevicePrompt.style.display = 'none';
     renderGameTable(state);
     showResultsModal(state.roundResults, state.status === 'GAME_OVER');
   }
@@ -982,7 +1027,7 @@ function renderGameTable(state) {
   }
 }
 
-// Opponents Sitting in Perimeter Oval around the Table (matching Screenshot_20261107-161519.png)
+// Opponents Sitting in Perimeter Oval around the Table
 function renderOpponents(opponents, currentTurnPlayerId) {
   const container = opponentsPerimeter || document.getElementById('opponentsPerimeter');
   if (!container) return;
@@ -990,28 +1035,73 @@ function renderOpponents(opponents, currentTurnPlayerId) {
 
   if (!opponents || opponents.length === 0) return;
 
-  const slotClasses = ['slot-left', 'slot-top-left', 'slot-top-center', 'slot-top-right', 'slot-right'];
+  const total = opponents.length;
+  const isPortrait = window.innerHeight > window.innerWidth;
 
   opponents.forEach((p, idx) => {
     const isCurrentTurn = p.id === currentTurnPlayerId;
     const slotDiv = document.createElement('div');
+    const avatarEmoji = p.eliminated ? '💀' : (p.isBot ? '🤖' : (p.avatar || '👤'));
+    const countDisplay = p.eliminated ? '💀' : (p.waitingNextRound ? '👁️' : (p.cardCount !== undefined ? p.cardCount : 7));
 
-    if (opponents.length <= 5) {
-      slotDiv.className = `opponent-slot ${slotClasses[idx] || 'slot-top-center'} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+    if (!isPortrait) {
+      // LANDSCAPE MODE: Wide Elliptical Perimeter
+      if (total <= 5) {
+        const slotClasses = ['slot-left', 'slot-top-left', 'slot-top-center', 'slot-top-right', 'slot-right'];
+        slotDiv.className = `opponent-slot ${slotClasses[idx] || 'slot-top-center'} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+      } else {
+        const angle = Math.PI - (idx / (total - 1)) * Math.PI;
+        const leftPct = 50 - 44 * Math.cos(angle);
+        const topPct = 36 - 26 * Math.sin(angle);
+        slotDiv.className = `opponent-slot ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+        slotDiv.style.left = `${leftPct}%`;
+        slotDiv.style.top = `${topPct}%`;
+        slotDiv.style.transform = 'translate(-50%, -50%)';
+        if (leftPct > 70) slotDiv.style.flexDirection = 'row-reverse';
+      }
     } else {
-      // Smooth elliptical arc for 6 to 14 opponents
-      const total = opponents.length;
-      const angle = Math.PI - (idx / (total - 1)) * Math.PI;
-      const leftPct = 50 - 45 * Math.cos(angle);
-      const topPct = 38 - 28 * Math.sin(angle);
-      slotDiv.className = `opponent-slot ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+      // PORTRAIT MODE: Horseshoe Perimeter (Left -> Top Arc -> Right)
+      let leftPct = 50;
+      let topPct = 9;
+      let flexDir = 'row';
+
+      if (total <= 3) {
+        if (idx === 0) { leftPct = 12; topPct = 26; flexDir = 'row'; }
+        else if (idx === 1) { leftPct = 50; topPct = 9; flexDir = 'column'; }
+        else { leftPct = 88; topPct = 26; flexDir = 'row-reverse'; }
+      } else {
+        const sideCount = Math.max(1, Math.floor(total * 0.35));
+        const topCount = total - 2 * sideCount;
+
+        if (idx < sideCount) {
+          // Left side
+          const step = (sideCount > 1) ? idx / (sideCount - 1) : 0.5;
+          leftPct = 9;
+          topPct = 36 - step * 18; // 36% down to 18%
+          flexDir = 'row';
+        } else if (idx < sideCount + topCount) {
+          // Top arc
+          const topIdx = idx - sideCount;
+          const step = (topCount > 1) ? topIdx / (topCount - 1) : 0.5;
+          leftPct = 24 + step * 52; // 24% to 76%
+          topPct = 9;
+          flexDir = 'column';
+        } else {
+          // Right side
+          const rightIdx = idx - (sideCount + topCount);
+          const step = (sideCount > 1) ? rightIdx / (sideCount - 1) : 0.5;
+          leftPct = 91;
+          topPct = 18 + step * 18; // 18% down to 36%
+          flexDir = 'row-reverse';
+        }
+      }
+
+      slotDiv.className = `opponent-slot compact-portrait ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
       slotDiv.style.left = `${leftPct}%`;
       slotDiv.style.top = `${topPct}%`;
       slotDiv.style.transform = 'translate(-50%, -50%)';
+      slotDiv.style.flexDirection = flexDir;
     }
-
-    const avatarEmoji = p.eliminated ? '💀' : (p.isBot ? '🤖' : (p.avatar || '👤'));
-    const countDisplay = p.eliminated ? '💀' : (p.waitingNextRound ? '👁️' : (p.cardCount !== undefined ? p.cardCount : 7));
 
     slotDiv.innerHTML = `
       <div class="opponent-profile">
