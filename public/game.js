@@ -140,6 +140,23 @@ const addSingleBotBtn = document.getElementById('addSingleBotBtn');
 const fillBotsBtn = document.getElementById('fillBotsBtn');
 const startGameBtn = document.getElementById('startGameBtn');
 
+// Top App Bar
+const topAppBar = document.querySelector('header.app-bar');
+
+// Opponents Perimeter Container
+const opponentsPerimeter = document.getElementById('opponentsPerimeter');
+
+// Top HUD Elements
+const tableCodeInHud = document.getElementById('tableCodeInHud');
+const gameMenuToggleBtn = document.getElementById('gameMenuToggleBtn');
+const gameMenuModal = document.getElementById('gameMenuModal');
+const menuCloseBtn = document.getElementById('menuCloseBtn');
+const menuRulesBtn = document.getElementById('menuRulesBtn');
+const menuCopyLinkBtn = document.getElementById('menuCopyLinkBtn');
+const menuAdminStopBtn = document.getElementById('menuAdminStopBtn');
+const menuExitBtn = document.getElementById('menuExitBtn');
+const menuTableCodeLabel = document.getElementById('menuTableCodeLabel');
+
 // In-Game Elements (Left: Deck & Joker | Middle: Dotted Drop Box | Right: Discard Stack)
 const arenaStadium = document.getElementById('arenaStadium');
 const roundNumberBadge = document.getElementById('roundNumberBadge');
@@ -380,16 +397,70 @@ adminStopGameBtn.addEventListener('click', () => {
   }
 });
 
+// In-Game Menu Modal (Hamburger ☰)
+if (gameMenuToggleBtn) {
+  gameMenuToggleBtn.addEventListener('click', () => {
+    if (gameMenuModal) {
+      if (menuTableCodeLabel) menuTableCodeLabel.innerText = currentRoomCode || '------';
+      if (menuAdminStopBtn) menuAdminStopBtn.style.display = isHost ? 'block' : 'none';
+      gameMenuModal.style.display = 'flex';
+      triggerHaptic('tap');
+    }
+  });
+}
+
+if (menuCloseBtn) {
+  menuCloseBtn.addEventListener('click', () => {
+    if (gameMenuModal) gameMenuModal.style.display = 'none';
+    triggerHaptic('tap');
+  });
+}
+
+if (menuRulesBtn) {
+  menuRulesBtn.addEventListener('click', () => {
+    if (gameMenuModal) gameMenuModal.style.display = 'none';
+    openRules();
+  });
+}
+
+if (menuCopyLinkBtn) {
+  menuCopyLinkBtn.addEventListener('click', () => {
+    copyInvite();
+    if (gameMenuModal) gameMenuModal.style.display = 'none';
+  });
+}
+
+if (menuAdminStopBtn) {
+  menuAdminStopBtn.addEventListener('click', () => {
+    if (confirm('⚠️ ADMIN ACTION:\n\nAre you sure you want to STOP the game entirely for all players? Everyone will return to the lobby.')) {
+      socket.emit('stopGame');
+      if (gameMenuModal) gameMenuModal.style.display = 'none';
+    }
+  });
+}
+
+if (menuExitBtn) {
+  menuExitBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to leave this table and return to the main menu?')) {
+      socket.emit('leaveRoom');
+      if (gameMenuModal) gameMenuModal.style.display = 'none';
+    }
+  });
+}
+
 socket.on('leftRoom', () => {
   currentRoomCode = null;
   sessionStorage.removeItem('leastcount_current_room');
   gameState = null;
   selectedCards.clear();
+  stagedCards = [];
   
+  if (topAppBar) topAppBar.style.display = 'flex';
   roomBadge.style.display = 'none';
   lobbyScreen.style.display = 'none';
   gameScreen.style.display = 'none';
   resultsModal.style.display = 'none';
+  if (gameMenuModal) gameMenuModal.style.display = 'none';
   homeScreen.style.display = 'flex';
 
   // Clean URL query
@@ -788,6 +859,7 @@ function renderGameState(state) {
   exitTableBtn.style.display = 'inline-block';
 
   if (state.status === 'LOBBY') {
+    if (topAppBar) topAppBar.style.display = 'flex';
     homeScreen.style.display = 'none';
     gameScreen.style.display = 'none';
     lobbyScreen.style.display = 'flex';
@@ -795,6 +867,7 @@ function renderGameState(state) {
 
     renderLobby(state);
   } else if (state.status === 'PLAYING') {
+    if (topAppBar) topAppBar.style.display = 'none';
     homeScreen.style.display = 'none';
     lobbyScreen.style.display = 'none';
     gameScreen.style.display = 'flex';
@@ -802,6 +875,7 @@ function renderGameState(state) {
 
     renderGameTable(state);
   } else if (state.status === 'ROUND_OVER' || state.status === 'GAME_OVER') {
+    if (topAppBar) topAppBar.style.display = 'none';
     renderGameTable(state);
     showResultsModal(state.roundResults, state.status === 'GAME_OVER');
   }
@@ -847,13 +921,17 @@ function renderLobby(state) {
   }
 }
 
-// 2. Render In-Game Table & 6 to 15 Player Arena
+// 2. Render In-Game Table & Fullscreen Immersive Canvas
 function renderGameTable(state) {
   roundNumberBadge.innerText = state.roundNumber;
   const scoringBadge = state.faceCardScoring === 'CLASSIC_13' ? 'Classic 10-13' : 'Standard 10s';
   deckShoeBadge.innerText = `(${state.deckCountUsed} Decks • ${scoringBadge})`;
   eliminationScoreBadge.innerText = state.eliminationScore;
-  maxScoreTarget.innerText = state.eliminationScore;
+  if (maxScoreTarget) maxScoreTarget.innerText = state.eliminationScore;
+
+  if (tableCodeInHud) {
+    tableCodeInHud.innerText = state.roomCode || currentRoomCode || '------';
+  }
 
   if (state.lastAction) {
     actionBanner.innerText = state.lastAction.text;
@@ -862,48 +940,32 @@ function renderGameTable(state) {
   deckCountBadge.innerText = state.drawPileCount;
   timerCircle.innerText = state.turnTimeRemaining;
 
-  // LEFT: Render Single Wild Joker Card Displayed at start of the game
+  // LEFT: Render Wild Joker Card Underneath Draw Deck (clearly showing rank & suit)
   if (state.wildJokerCard) {
     wildJokerSlot.innerHTML = createCardInner(state.wildJokerCard, true);
-    wildJokerSlot.className = `under-deck-wild-card single-card wild-joker-card ${state.wildJokerCard.color}`;
-    if (wildJokerMiniLabel) {
-      wildJokerMiniLabel.innerText = `★ Wild: ${state.wildJokerCard.rank} (0 pts)`;
-    }
+    wildJokerSlot.className = `wild-joker-under-card single-card ${state.wildJokerCard.color}`;
   } else {
-    wildJokerSlot.innerHTML = `<div style="margin:auto; font-size:11px; opacity:0.5;">No Joker</div>`;
-    if (wildJokerMiniLabel) {
-      wildJokerMiniLabel.innerText = '★ Wild Joker';
-    }
+    wildJokerSlot.innerHTML = '';
   }
 
-  // RIGHT: Render Discard Stack (Where dropped cards are shown like in the game!)
+  // RIGHT: Render Discard Stack (Where open dropped cards are shown)
   if (state.topDiscard) {
-    discardPileCardWrapper.innerHTML = createCardHTML(state.topDiscard, false);
-  } else {
-    discardPileCardWrapper.innerHTML = `<div class="single-card" style="opacity:0.3; justify-content:center; align-items:center;">Empty</div>`;
-  }
-
-  // TOP: Render Top Stadium (6 to 15 Players)
-  arenaStadium.innerHTML = '';
-  state.players.forEach(p => {
-    const isCurrentTurn = p.id === state.currentTurnPlayerId;
-    const isMe = p.id === myPlayerId;
-    const badge = document.createElement('div');
-    badge.className = `stadium-badge ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
-
-    const icon = p.eliminated ? '💀' : (p.isBot ? '🤖' : (p.avatar || (isMe ? '⭐' : '👤')));
-
-    badge.innerHTML = `
-      ${isCurrentTurn ? '<div class="turn-indicator"></div>' : ''}
-      <div style="font-size:16px;">${icon}</div>
-      <div class="p-name">${p.name}${isMe ? ' (You)' : ''}</div>
-      <div class="p-stats">
-        <span class="p-cards">${p.waitingNextRound ? 'Spectating' : `🂠 ${p.cardCount}`}</span>
-        <span class="p-score">${p.score} pts</span>
+    discardPileCardWrapper.innerHTML = `
+      <div class="single-card ${state.topDiscard.color} ${state.topDiscard.isWild ? 'wild-joker-card' : ''}">
+        ${createCardInner(state.topDiscard, false)}
       </div>
     `;
-    arenaStadium.appendChild(badge);
-  });
+  } else {
+    discardPileCardWrapper.innerHTML = `<div class="single-card" style="opacity:0.25; border:1.5px dashed rgba(255,255,255,0.3);"></div>`;
+  }
+
+  // OPPONENTS: Render all opponents around the table perimeter
+  const opponents = state.players.filter(p => p.id !== myPlayerId);
+  renderOpponents(opponents, state.currentTurnPlayerId);
+
+  if (arenaStadium) {
+    arenaStadium.innerHTML = '';
+  }
 
   // Render My Hand & Update Table Direct Interaction cues
   const myPlayer = state.players.find(p => p.id === myPlayerId);
@@ -914,11 +976,61 @@ function renderGameTable(state) {
     if (myGameScore) {
       myGameScore.innerText = myPlayer.score;
     }
-    myHandPoints.innerText = myPlayer.waitingNextRound ? 'Spectating' : (myPlayer.handScore !== null ? myPlayer.handScore : '--');
 
     updateHandUI();
     updateActionUI();
   }
+}
+
+// Opponents Sitting in Perimeter Oval around the Table (matching Screenshot_20261107-161519.png)
+function renderOpponents(opponents, currentTurnPlayerId) {
+  const container = opponentsPerimeter || document.getElementById('opponentsPerimeter');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!opponents || opponents.length === 0) return;
+
+  const slotClasses = ['slot-left', 'slot-top-left', 'slot-top-center', 'slot-top-right', 'slot-right'];
+
+  opponents.forEach((p, idx) => {
+    const isCurrentTurn = p.id === currentTurnPlayerId;
+    const slotDiv = document.createElement('div');
+
+    if (opponents.length <= 5) {
+      slotDiv.className = `opponent-slot ${slotClasses[idx] || 'slot-top-center'} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+    } else {
+      // Smooth elliptical arc for 6 to 14 opponents
+      const total = opponents.length;
+      const angle = Math.PI - (idx / (total - 1)) * Math.PI;
+      const leftPct = 50 - 45 * Math.cos(angle);
+      const topPct = 38 - 28 * Math.sin(angle);
+      slotDiv.className = `opponent-slot ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+      slotDiv.style.left = `${leftPct}%`;
+      slotDiv.style.top = `${topPct}%`;
+      slotDiv.style.transform = 'translate(-50%, -50%)';
+    }
+
+    const avatarEmoji = p.eliminated ? '💀' : (p.isBot ? '🤖' : (p.avatar || '👤'));
+    const countDisplay = p.eliminated ? '💀' : (p.waitingNextRound ? '👁️' : (p.cardCount !== undefined ? p.cardCount : 7));
+
+    slotDiv.innerHTML = `
+      <div class="opponent-profile">
+        <div class="opponent-avatar-ring">
+          ${isCurrentTurn ? '<div class="turn-halo"></div>' : ''}
+          <span class="opponent-avatar-emoji">${avatarEmoji}</span>
+        </div>
+        <div class="opponent-name-label" title="${p.name}">${p.name}</div>
+      </div>
+      <div class="opponent-cards-fan">
+        <div class="fan-card f1"></div>
+        <div class="fan-card f2"></div>
+        <div class="fan-card f3"></div>
+        <div class="fan-count-badge">${countDisplay}</div>
+      </div>
+    `;
+
+    container.appendChild(slotDiv);
+  });
 }
 
 function calculateHandScore(cards) {
@@ -934,36 +1046,110 @@ function createCardHTML(card, isSelected) {
   `;
 }
 
+// Authentic Playing Card Royal SVG Illustrations (King, Queen, Jack)
+function getCourtSvg(rank, suit, isRed) {
+  const strokeColor = isRed ? '#d00000' : '#1a1a1a';
+  const fillColor = isRed ? '#ffe8e8' : '#eef2f7';
+  const goldColor = '#f5c542';
+
+  if (rank === 'K') {
+    return `
+      <svg class="court-svg" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 28 C12 20 20 16 24 16 C28 16 36 20 36 28 C36 34 32 40 24 40 C16 40 12 34 12 28 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>
+        <path d="M14 18 L19 22 L24 16 L29 22 L34 18 L32 26 L16 26 Z" fill="${goldColor}" stroke="#b8860b" stroke-width="1"/>
+        <circle cx="24" cy="14" r="2" fill="${goldColor}"/>
+        <path d="M16 40 L10 66 L38 66 L32 40 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>
+        <path d="M24 40 L24 66" stroke="${strokeColor}" stroke-width="1.5"/>
+        <text x="24" y="55" font-size="13" text-anchor="middle" fill="${strokeColor}">${suit}</text>
+      </svg>
+    `;
+  }
+  if (rank === 'Q') {
+    return `
+      <svg class="court-svg" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 26 C14 18 20 16 24 16 C28 16 34 18 34 26 C34 32 30 38 24 38 C18 38 14 32 14 26 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>
+        <path d="M16 19 Q24 14 32 19 L30 24 L18 24 Z" fill="${goldColor}" stroke="#b8860b" stroke-width="1"/>
+        <circle cx="24" cy="13" r="2.5" fill="${goldColor}"/>
+        <path d="M16 38 L12 66 L36 66 L32 38 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>
+        <circle cx="24" cy="50" r="4" fill="${strokeColor}"/>
+        <text x="24" y="63" font-size="11" text-anchor="middle" fill="${strokeColor}">${suit}</text>
+      </svg>
+    `;
+  }
+  if (rank === 'J') {
+    return `
+      <svg class="court-svg" viewBox="0 0 48 72" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 26 C14 19 20 17 24 17 C28 17 34 19 34 26 C34 33 30 38 24 38 C18 38 14 33 14 26 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>
+        <path d="M16 20 L24 15 L32 20 L28 25 L20 25 Z" fill="${goldColor}" stroke="#b8860b" stroke-width="1"/>
+        <path d="M17 38 L12 66 L36 66 L31 38 Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>
+        <line x1="30" y1="36" x2="38" y2="66" stroke="${goldColor}" stroke-width="2.5"/>
+        <circle cx="38" cy="66" r="3" fill="${goldColor}"/>
+        <text x="22" y="55" font-size="12" text-anchor="middle" fill="${strokeColor}">${suit}</text>
+      </svg>
+    `;
+  }
+  return '';
+}
+
+// Authentic Playing Card Inner HTML (clean indices, centered royalty/pip, NO 'pts' stamp)
 function createCardInner(card, isTableJoker = false) {
   if (card.rank === '?') {
-    return `
-      <div style="margin:auto; font-size:24px; color:#aaa;">🂠</div>
+    return `<div style="margin:auto; font-size:24px; color:#aaa;">🂠</div>`;
+  }
+
+  const isJoker = card.isJoker || card.rank === 'JOKER';
+  const isWild = !!card.isWild;
+  const isRed = card.color === 'red' || card.suit === '♥' || card.suit === '♦';
+  const suitIcon = isJoker ? '★' : (card.suit || '');
+  const rankText = isJoker ? 'J' : card.rank;
+
+  let centerContent = '';
+  if (isJoker) {
+    centerContent = `
+      <div class="joker-center-art">
+        <span style="font-size:24px;">🃏</span>
+        <span class="joker-star-label">JOKER</span>
+      </div>
+    `;
+  } else if (['K', 'Q', 'J'].includes(card.rank)) {
+    centerContent = `
+      <div class="court-figure">
+        ${getCourtSvg(card.rank, suitIcon, isRed)}
+      </div>
+    `;
+  } else {
+    // Number card or Ace
+    centerContent = `
+      <div class="number-center-suit ${isRed ? 'red-suit' : 'black-suit'}">
+        ${suitIcon}
+      </div>
     `;
   }
 
-  const suitIcon = card.suit;
-  const isJoker = card.isJoker || card.isWild;
+  const wildBadge = isWild || isTableJoker ? `
+    <div class="card-wild-star-badge">★ WILD</div>
+  ` : '';
 
   return `
-    <div class="card-corner">
-      <div>${card.rank}</div>
-      <div style="font-size:10px;">${card.isJoker ? '★' : suitIcon}</div>
+    <div class="card-index top-left">
+      <span class="index-rank">${rankText}</span>
+      <span class="index-suit">${suitIcon}</span>
     </div>
-    <div class="card-points-badge">${card.points} pts</div>
-    <div class="card-center-suit">${card.isJoker ? '🃏' : suitIcon}</div>
-    ${isTableJoker || card.isWild ? `<div class="wild-joker-badge">★ WILD (0 pts)</div>` : ''}
-    <div class="card-corner" style="transform: rotate(180deg);">
-      <div>${card.rank}</div>
-      <div style="font-size:10px;">${card.isJoker ? '★' : suitIcon}</div>
+    ${centerContent}
+    ${wildBadge}
+    <div class="card-index bottom-right">
+      <span class="index-rank">${rankText}</span>
+      <span class="index-suit">${suitIcon}</span>
     </div>
   `;
 }
 
+// Center Dashed Drop Zone (Clean layout, fanned horizontal cards, ZERO yellow banners)
 function renderMiddleDropBox(isMyTurn, turnPhase) {
   if (stagedCards.length > 0) {
     middleDropPlaceholder.style.display = 'none';
     middleStagedCardContainer.style.display = 'block';
-    middleDottedDropBox.className = 'middle-drop-box has-staged';
+    middleDottedDropBox.className = 'middle-drop-zone has-staged';
 
     const count = stagedCards.length;
     const isMobile = window.innerWidth <= 600;
@@ -971,8 +1157,8 @@ function renderMiddleDropBox(isMyTurn, turnPhase) {
     const cardH = isMobile ? 78 : 92;
     const offset = count > 1 ? Math.min(22, Math.floor(62 / (count - 1))) : 0;
     const totalW = cardW + (count - 1) * offset;
-    const boxW = middleDottedDropBox.clientWidth || (isMobile ? 116 : 140);
-    const startLeft = Math.max(0, Math.floor((boxW - totalW) / 2));
+    const boxW = middleDottedDropBox.clientWidth || (isMobile ? 122 : 140);
+    const startLeft = Math.max(4, Math.floor((boxW - totalW) / 2));
 
     const cardsHtml = stagedCards.map((card, i) => `
       <div class="single-card ${card.color} ${card.isWild ? 'wild-joker-card' : ''}"
@@ -981,10 +1167,7 @@ function renderMiddleDropBox(isMyTurn, turnPhase) {
       </div>
     `).join('');
 
-    const multiBadge = count > 1 ? `<div class="staged-badge">${count}x DROP</div>` : `<div class="staged-badge">DROP</div>`;
-    const hintHtml = `<div class="staged-return-hint">↩ Tap to change</div>`;
-
-    middleStagedCardContainer.innerHTML = multiBadge + cardsHtml + hintHtml;
+    middleStagedCardContainer.innerHTML = cardsHtml;
     if (returnStagedCardBtn) returnStagedCardBtn.style.display = 'none';
   } else {
     middleDropPlaceholder.style.display = 'flex';
@@ -993,9 +1176,9 @@ function renderMiddleDropBox(isMyTurn, turnPhase) {
     if (returnStagedCardBtn) returnStagedCardBtn.style.display = 'none';
 
     if (isMyTurn && turnPhase === 'DROP') {
-      middleDottedDropBox.className = 'middle-drop-box active-drop';
+      middleDottedDropBox.className = 'middle-drop-zone active-drop';
     } else {
-      middleDottedDropBox.className = 'middle-drop-box';
+      middleDottedDropBox.className = 'middle-drop-zone';
     }
   }
 }
@@ -1109,10 +1292,9 @@ function updateActionUI() {
     if (cornerActionButton) {
       if (gameState.topDiscard && myPlayer && !myPlayer.eliminated && !myPlayer.waitingNextRound &&
           myPlayer.hand.some(c => c.rank === gameState.topDiscard.rank || (c.isWild && gameState.topDiscard.isWild))) {
-        const slashRank = gameState.topDiscard.rank;
         cornerActionButton.style.display = 'inline-flex';
-        cornerActionButton.className = 'corner-action-btn btn-corner-slash';
-        cornerActionButton.innerHTML = `⚡ Slash (${slashRank})`;
+        cornerActionButton.className = 'corner-action-btn btn-slash';
+        cornerActionButton.innerHTML = `Slash`;
         cornerActionButton.onclick = executeSlash;
       } else {
         cornerActionButton.style.display = 'none';
@@ -1136,6 +1318,8 @@ function updateActionUI() {
     turnStatusBadge.className = 'turn-status-badge my-turn';
   }
 
+  const myCurrentScore = myPlayer.handScore !== null ? myPlayer.handScore : calculateHandScore(myPlayer.hand);
+
   // 1. If card(s) are staged in middle box: Ready to draw from LEFT deck or RIGHT discard to finish turn!
   if (stagedCards.length > 0) {
     if (turnStatusBadge) turnStatusBadge.innerText = 'Tap Left Deck or Discard to Draw';
@@ -1143,34 +1327,42 @@ function updateActionUI() {
     drawPileBtn.classList.add('can-draw');
     discardStackPile.classList.add('can-draw');
 
-    // While cards are staged, hide corner action button
-    if (cornerActionButton) cornerActionButton.style.display = 'none';
-    if (callShowBtn) callShowBtn.style.display = 'none';
+    // If initial score was <= 10, keep Show available in corner
+    if (cornerActionButton) {
+      if (myCurrentScore <= 10) {
+        cornerActionButton.style.display = 'inline-flex';
+        cornerActionButton.className = 'corner-action-btn btn-show';
+        cornerActionButton.innerHTML = `Show`;
+        cornerActionButton.onclick = declareShow;
+      } else {
+        cornerActionButton.style.display = 'none';
+        cornerActionButton.onclick = null;
+      }
+    }
+
+    if (callShowBtn) callShowBtn.style.display = myCurrentScore <= 10 ? 'inline-flex' : 'none';
     if (slashBtn) slashBtn.style.display = 'none';
     if (dropCardsBtn) dropCardsBtn.style.display = 'none';
     return;
   }
 
-  // 2. DROP Phase: player needs to tap card(s) to place into middle box
+  // 2. DROP Phase on My Turn (Nothing staged yet)
   if (turnPhase === 'DROP') {
     if (turnStatusBadge) turnStatusBadge.innerText = 'Your Turn: Tap Card(s) to Drop';
 
-    const myCurrentScore = myPlayer.handScore !== null ? myPlayer.handScore : calculateHandScore(myPlayer.hand);
-
     // UNIFIED BOTTOM-RIGHT ACTION BUTTON:
-    // When score <= 10 on your turn: SHOW appears!
-    // Or if top discard matches a card in hand: SLASH appears!
+    // If score <= 10 on your turn: SHOW appears!
+    // Else if top discard matches a card in hand: SLASH appears!
     if (cornerActionButton) {
       if (myCurrentScore <= 10) {
         cornerActionButton.style.display = 'inline-flex';
-        cornerActionButton.className = 'corner-action-btn btn-corner-show';
-        cornerActionButton.innerHTML = `👑 Show (${myCurrentScore})`;
+        cornerActionButton.className = 'corner-action-btn btn-show';
+        cornerActionButton.innerHTML = `Show`;
         cornerActionButton.onclick = declareShow;
       } else if (gameState.topDiscard && myPlayer.hand.some(c => c.rank === gameState.topDiscard.rank || (c.isWild && gameState.topDiscard.isWild))) {
-        const slashRank = gameState.topDiscard.rank;
         cornerActionButton.style.display = 'inline-flex';
-        cornerActionButton.className = 'corner-action-btn btn-corner-slash';
-        cornerActionButton.innerHTML = `⚡ Slash (${slashRank})`;
+        cornerActionButton.className = 'corner-action-btn btn-slash';
+        cornerActionButton.innerHTML = `Slash`;
         cornerActionButton.onclick = executeSlash;
       } else {
         cornerActionButton.style.display = 'none';

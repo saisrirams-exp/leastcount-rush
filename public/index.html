@@ -138,111 +138,140 @@
       </div>
     </section>
 
-    <!-- 3. IN-GAME TABLE SCREEN -->
-    <section id="gameScreen" class="game-arena" style="display:none;">
+    <!-- 3. IN-GAME TABLE SCREEN (Full-Screen Immersive Canvas matching Play Store) -->
+    <section id="gameScreen" class="game-arena-fullscreen" style="display:none;">
 
-      <!-- Top Stadium Bar for 6 to 15 Players -->
-      <div id="arenaStadium" class="arena-stadium">
+      <!-- Luxury 3D Gold Playing Card Corner Accents -->
+      <div class="table-corner-card corner-top-left" aria-hidden="true"></div>
+      <div class="table-corner-heart corner-top-right" aria-hidden="true"></div>
+      <div class="table-corner-fan corner-bottom-right" aria-hidden="true"></div>
+
+      <!-- Top Table Header -->
+      <div class="table-hud-header">
+        <button id="gameMenuToggleBtn" class="hud-menu-btn" title="Game Menu & Rules">☰</button>
+        <div class="table-status-pills">
+          <div class="hud-pill">ROUND <span id="roundNumberBadge" class="gold-text">1</span> <span id="deckShoeBadge" style="font-size:10px; opacity:0.7;"></span></div>
+          <div id="actionBanner" class="hud-action-banner">Game in progress</div>
+          <div class="hud-pill knockout-pill">KNOCKOUT: <span id="eliminationScoreBadge" class="danger-text">150</span></div>
+        </div>
+        <div class="hud-table-code-pill">
+          <span id="tableCodeInHud">------</span>
+        </div>
+      </div>
+
+      <!-- Turn Timer Floating Indicator -->
+      <div class="floating-timer-wrap">
+        <div id="timerCircle" class="table-timer-circle">12</div>
+      </div>
+
+      <!-- Opponents Sitting Around the Table Perimeter -->
+      <div id="opponentsPerimeter" class="opponents-perimeter">
         <!-- Injected via JavaScript dynamically -->
       </div>
 
-      <!-- Center Luxury Felt Table -->
-      <div class="felt-table">
-        <div class="table-header-info">
-          <div class="info-pill round-pill">
-            ROUND <span id="roundNumberBadge" class="gold-text">1</span>
-            <span id="deckShoeBadge" class="shoe-text"></span>
-          </div>
-          <div id="actionBanner" class="action-banner">Game in progress</div>
-          <div class="info-pill knockout-pill">
-            KNOCKOUT: <span id="eliminationScoreBadge" class="danger-text">150</span>
+      <!-- Center Table Hub: Wild Joker & Draw Deck (Left) | Dashed Drop Zone (Middle) | Discard Stack (Right) -->
+      <div class="center-table-hub">
+
+        <!-- LEFT: Draw Deck sitting offset on top of Wild Joker Cut Card -->
+        <div class="draw-pile-group">
+          <!-- Wild Joker Card (Face Up underneath, clearly showing rank & suit) -->
+          <div id="wildJokerSlot" class="wild-joker-under-card" title="Wild Joker (All cards of this rank are 0 pts)"></div>
+          <!-- Closed Draw Deck on Top -->
+          <div id="drawPileBtn" class="draw-deck-card interactive-pile" title="Draw Deck (Tap to draw card)">
+            <div class="deck-back-pattern">
+              <div class="deck-suits-accent">♦ ♣ ♥ ♠</div>
+              <div class="deck-title-badge">LEAST COUNT<br><strong>RUSH</strong></div>
+              <div class="deck-suits-accent">♠ ♥ ♣ ♦</div>
+            </div>
+            <div id="deckCountBadge" class="deck-counter-badge">108</div>
           </div>
         </div>
 
-        <!-- Central Table Hub: Left (Draw Deck & Wild Joker) | Middle (Dashed Drop Box) | Right (Discard Stack) -->
-        <div class="table-center-hub">
-
-          <!-- LEFT: Closed Draw Deck with Offset Wild Joker Peeking Underneath -->
-          <div class="table-side-column left-column">
-            <div class="deck-wild-stack">
-              <!-- Wild Joker Cut Card (tucked underneath, rotated) -->
-              <div id="wildJokerSlot" class="under-deck-wild-card" title="Wild Joker (All cards of this rank are 0 pts)">
-                <!-- Rendered dynamically -->
-              </div>
-              <!-- Closed Draw Deck on top -->
-              <div id="drawPileBtn" class="card-pile deck-back interactive-pile" title="Draw Deck (Tap to draw card)">
-                <span class="deck-icon">🂠</span>
-                <span id="deckCountBadge" class="deck-count">108</span>
-              </div>
-            </div>
-            <div id="wildJokerMiniLabel" class="wild-mini-badge">★ Wild Joker</div>
+        <!-- MIDDLE: Clean Dashed Drop Zone (Cards fan out horizontally when dropped) -->
+        <div id="middleDottedDropBox" class="middle-drop-zone" title="Tap cards in hand to drop here, or tap to take back">
+          <div id="middleDropPlaceholder" class="drop-zone-empty-hint">
+            <span class="dashed-drop-guide"></span>
           </div>
-
-          <!-- MIDDLE: Turn Timer & Dashed Drop Box -->
-          <div class="table-middle-column">
-            <div class="timer-dial">
-              <div id="timerCircle" class="timer-circle">12</div>
-            </div>
-
-            <!-- The Dashed Drop Box in the Middle -->
-            <div id="middleDottedDropBox" class="middle-drop-box" title="Drop your card(s) here">
-              <div id="middleDropPlaceholder" class="drop-box-content">
-                <span class="drop-box-icon">⬇️</span>
-                <span class="drop-box-text">DROP HERE</span>
-              </div>
-              <div id="middleStagedCardContainer" class="staged-cards-wrapper" style="display:none;">
-                <!-- Staged cards fan out horizontally here -->
-              </div>
-            </div>
+          <div id="middleStagedCardContainer" class="staged-cards-fanned" style="display:none;">
+            <!-- Fanned out cards render here -->
           </div>
-
-          <!-- RIGHT: Discard Pile (Where dropped cards are shown) -->
-          <div class="table-side-column right-column">
-            <div id="discardStackPile" class="card-pile interactive-pile" title="Discard pile (Tap to draw or slash)">
-              <div id="discardPileCardWrapper">
-                <!-- Dropped cards shown here dynamically -->
-              </div>
-            </div>
-            <div class="discard-mini-badge">Discard Stack</div>
-          </div>
-
         </div>
 
-        <div id="turnStatusNotice" class="turn-status-notice">
-          <span id="turnStatusBadge" class="turn-status-badge">Waiting…</span>
+        <!-- RIGHT: Open Discard Stack -->
+        <div id="discardStackPile" class="discard-pile-group interactive-pile" title="Discard pile (Tap to draw or slash)">
+          <div id="discardPileCardWrapper">
+            <!-- Top discarded card rendered dynamically -->
+          </div>
         </div>
+
       </div>
 
-      <!-- Bottom Player Bar (Avatar + Count + Sort | Hand Cards | Unified Show/Slash Action) -->
-      <div class="game-bottom-bar">
-        <!-- Player Info HUD (Left) -->
+      <!-- Bottom Bar: Player HUD (Left) | Hand Cards (Center) | Show/Slash Action (Right) -->
+      <div class="table-bottom-bar">
+        <!-- Player HUD: Avatar, Count Pill, Sort Button -->
         <div class="player-hud-left">
-          <div class="player-hud-avatar-wrap">
-            <div id="myPlayerAvatar" class="hud-avatar">👑</div>
-            <span class="hud-name">You</span>
+          <div class="hud-avatar-box">
+            <div id="myPlayerAvatar" class="hud-avatar-circle">👑</div>
+            <span class="hud-you-label">You</span>
           </div>
-          <div class="hud-info-col">
-            <div class="hud-count-badge">
-              Count: <span id="myHandPoints" class="pts">0</span>
+          <div class="hud-controls-box">
+            <div class="hud-count-capsule">
+              <span class="count-title">Count</span>
+              <span id="myHandPoints" class="count-val">0</span>
             </div>
-            <button id="sortCardsBtn" class="hud-sort-btn" title="Sort Cards Ascending (A ➔ K)">
-              <span style="font-size:13px; line-height:1;">≡</span> Sort
+            <button id="sortCardsBtn" class="hud-action-mini-btn" title="Sort Hand Ascending (A ➔ K)">
+              <span style="font-size:14px; line-height:1;">≡</span> Sort
             </button>
           </div>
         </div>
 
         <!-- Center Player Hand Cards -->
-        <div id="myHandCards" class="hand-cards">
-          <!-- Hand cards rendered dynamically -->
+        <div id="myHandCards" class="hand-cards-container">
+          <!-- Standard playing cards rendered here -->
         </div>
 
-        <!-- Corner Contextual Action Button (Right: SHOW or SLASH) -->
+        <!-- Right: Unified Glassmorphic Action Button (Show or Slash) -->
         <div class="player-hud-right">
           <button id="cornerActionButton" class="corner-action-btn" style="display:none;"></button>
         </div>
       </div>
 
+      <!-- Hidden Fallback Controls for Compatibility -->
+      <div style="display:none;">
+        <span id="turnStatusBadge"></span>
+        <button id="callShowBtn"></button>
+        <span id="callShowPoints"></span>
+        <button id="slashBtn"></button>
+        <span id="slashRankText"></span>
+        <button id="dropCardsBtn"></button>
+        <button id="returnStagedCardBtn"></button>
+        <span id="wildJokerMiniLabel"></span>
+        <span id="myGameScore"></span>
+        <span id="maxScoreTarget"></span>
+        <div id="turnGuidePrompt"></div>
+      </div>
+
     </section>
+
+  </main>
+
+  <!-- IN-GAME MENU MODAL (Triggered by Hamburger ☰) -->
+  <div id="gameMenuModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:380px;">
+      <div class="modal-header">
+        <h2 style="color:var(--gold);">Least Count Rush</h2>
+        <p style="font-size:13px; color:rgba(253,250,243,0.7); margin-top:4px;">Table <strong id="menuTableCodeLabel" style="color:#fff; letter-spacing:1.5px;">------</strong></p>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <button id="menuCopyLinkBtn" class="btn-secondary" style="padding:12px; font-size:14px;">📋 Copy Table Invite Link</button>
+        <button id="menuRulesBtn" class="btn-secondary" style="padding:12px; font-size:14px;">📖 How to Play & Rules</button>
+        <button id="menuAdminStopBtn" class="btn-secondary" style="display:none; padding:12px; font-size:14px; color:var(--danger); border-color:var(--danger);">🛑 End Game for All (Admin)</button>
+        <button id="menuExitBtn" class="btn-secondary" style="padding:12px; font-size:14px; background:rgba(239,35,60,0.15); border-color:var(--danger); color:#fff;">🚪 Leave Table</button>
+        <button id="menuCloseBtn" class="btn-primary" style="margin-top:10px;">Back to Game</button>
+      </div>
+    </div>
+  </div>
 
   </main>
 
