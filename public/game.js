@@ -631,9 +631,172 @@ nextRoundBtn.addEventListener('click', () => {
 });
 
 // -----------------------------------------------------------------------------
-// CARD INTERACTION: DIRECT TAP TO DROP (OR MULTI-DROP SAME RANK)
+// CARD WIPE & PHYSICAL FLIGHT ANIMATION ENGINE
 // -----------------------------------------------------------------------------
-function onHandCardClick(cardId) {
+/**
+ * Wipes / flies a card element from source position to destination position with realistic rotation and shadow
+ */
+function flyCardWipe(from, to, cardHtml, options = {}) {
+  const fromRect = from instanceof HTMLElement ? from.getBoundingClientRect() : from;
+  const toRect = to instanceof HTMLElement ? to.getBoundingClientRect() : to;
+  if (!fromRect || !toRect || fromRect.width === 0 || toRect.width === 0) {
+    if (options.onComplete) options.onComplete();
+    return;
+  }
+
+  const duration = options.duration || 240;
+  const flyingEl = document.createElement('div');
+  flyingEl.className = `flying-card-wipe single-card ${options.cardClass || ''}`;
+  flyingEl.innerHTML = cardHtml || '';
+
+  // Initial position matching source
+  flyingEl.style.left = `${fromRect.left}px`;
+  flyingEl.style.top = `${fromRect.top}px`;
+  flyingEl.style.width = `${fromRect.width}px`;
+  flyingEl.style.height = `${fromRect.height}px`;
+  flyingEl.style.setProperty('--fly-duration', `${duration}ms`);
+  flyingEl.style.transform = `scale(1) rotate(${options.fromRotate || 0}deg)`;
+
+  document.body.appendChild(flyingEl);
+
+  if (window.soundFx && window.soundFx.playCardWhoosh) {
+    window.soundFx.playCardWhoosh();
+  }
+
+  // Next frame: animate to destination
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const deltaX = toRect.left - fromRect.left + (toRect.width - fromRect.width) / 2;
+      const deltaY = toRect.top - fromRect.top + (toRect.height - fromRect.height) / 2;
+      const scale = toRect.width / fromRect.width;
+      const toRotate = options.toRotate !== undefined ? options.toRotate : (Math.random() * 8 - 4);
+
+      flyingEl.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(${scale}) rotate(${toRotate}deg)`;
+      if (options.fadeOut) flyingEl.style.opacity = '0';
+    });
+  });
+
+  setTimeout(() => {
+    if (flyingEl.parentNode) flyingEl.parentNode.removeChild(flyingEl);
+    if (options.onComplete) options.onComplete();
+  }, duration + 25);
+}
+
+/**
+ * Wipes a mini ghost card across the table for opponent/bot actions
+ */
+function flyOpponentGhostCard(fromEl, toEl, onComplete) {
+  if (!fromEl || !toEl) {
+    if (onComplete) onComplete();
+    return;
+  }
+  const fromRect = fromEl.getBoundingClientRect();
+  const toRect = toEl.getBoundingClientRect();
+  if (fromRect.width === 0 || toRect.width === 0) {
+    if (onComplete) onComplete();
+    return;
+  }
+
+  const ghostEl = document.createElement('div');
+  ghostEl.className = 'opponent-ghost-card';
+  ghostEl.innerHTML = '🂠';
+
+  const startX = fromRect.left + fromRect.width / 2 - 19;
+  const startY = fromRect.top + fromRect.height / 2 - 27;
+  const targetX = toRect.left + toRect.width / 2 - 19;
+  const targetY = toRect.top + toRect.height / 2 - 27;
+
+  ghostEl.style.left = `${startX}px`;
+  ghostEl.style.top = `${startY}px`;
+  ghostEl.style.setProperty('--fly-duration', '290ms');
+
+  document.body.appendChild(ghostEl);
+
+  if (window.soundFx && window.soundFx.playCardWhoosh) {
+    window.soundFx.playCardWhoosh();
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      ghostEl.style.transform = `translate(${targetX - startX}px, ${targetY - startY}px) scale(0.9) rotate(${Math.random() * 16 - 8}deg)`;
+    });
+  });
+
+  setTimeout(() => {
+    if (ghostEl.parentNode) ghostEl.parentNode.removeChild(ghostEl);
+    if (onComplete) onComplete();
+  }, 310);
+}
+
+/**
+ * Confetti celebration effect on Good Show
+ */
+function launchCelebrationConfetti() {
+  const canvas = document.getElementById('celebrationCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.display = 'block';
+
+  const colors = ['#f5c542', '#d4af37', '#e63946', '#2ecc71', '#3498db', '#ffffff', '#ffd166'];
+  const particles = [];
+  const particleCount = Math.min(80, Math.floor(window.innerWidth / 12));
+
+  for (let i = 0; i < particleCount; i++) {
+    particles.push({
+      x: canvas.width * (0.35 + Math.random() * 0.3),
+      y: canvas.height * 0.42,
+      vx: (Math.random() - 0.5) * 14,
+      vy: (Math.random() - 0.75) * 15,
+      size: Math.random() * 8 + 5,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      vRot: (Math.random() - 0.5) * 12,
+      opacity: 1,
+      gravity: 0.28,
+      drag: 0.96
+    });
+  }
+
+  const startTime = Date.now();
+  function animate() {
+    const elapsed = Date.now() - startTime;
+    if (elapsed > 3000) {
+      canvas.style.display = 'none';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.vx *= p.drag;
+      p.vy = p.vy * p.drag + p.gravity;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rotation += p.vRot;
+      if (elapsed > 1800) {
+        p.opacity = Math.max(0, 1 - (elapsed - 1800) / 1200);
+      }
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.rotation * Math.PI) / 180);
+      ctx.globalAlpha = p.opacity;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      ctx.restore();
+    });
+
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+
+// -----------------------------------------------------------------------------
+// CARD INTERACTION: DIRECT TAP & SWIPE-TO-DROP WITH WIPE ANIMATION
+// -----------------------------------------------------------------------------
+function onHandCardClick(cardId, cardEl) {
   if (!gameState) return;
   const isMyTurn = gameState.currentTurnPlayerId === myPlayerId;
   const isDropPhase = isMyTurn && gameState.turnPhase === 'DROP';
@@ -654,48 +817,72 @@ function onHandCardClick(cardId) {
     return;
   }
 
-  // IT IS DROP PHASE ON MY TURN:
-  // 1. If nothing staged yet: stage this card!
-  if (stagedCards.length === 0) {
-    stagedCards = [targetCard];
-    window.soundFx.playCardDrop();
-    updateHandUI();
-    updateActionUI();
-    showToast(`Dropped ${targetCard.rank}! Tap Left Deck or Discard to pick.`);
-    return;
-  }
-
-  // 2. If card(s) already staged:
-  const firstRank = stagedCards[0].rank;
-  const firstIsWild = stagedCards[0].isWild;
-  const isSameRank = targetCard.rank === firstRank || (targetCard.isWild && firstIsWild);
-
-  if (isSameRank) {
-    // Add to staged cards (multi-card drop!)
-    if (!stagedCards.some(c => c.id === targetCard.id)) {
-      stagedCards.push(targetCard);
+  // Commit logic after flight wipe completes
+  const commitDrop = () => {
+    // 1. If nothing staged yet: stage this card!
+    if (stagedCards.length === 0) {
+      stagedCards = [targetCard];
       window.soundFx.playCardDrop();
+      triggerHaptic('drop');
       updateHandUI();
       updateActionUI();
-      showToast(`Added another ${targetCard.rank} (${stagedCards.length}x)! Tap Deck or Discard to finish.`);
+      showToast(`Dropped ${targetCard.rank}! Tap Left Deck or Discard to pick.`);
+      return;
     }
+
+    // 2. If card(s) already staged:
+    const firstRank = stagedCards[0].rank;
+    const firstIsWild = stagedCards[0].isWild;
+    const isSameRank = targetCard.rank === firstRank || (targetCard.isWild && firstIsWild);
+
+    if (isSameRank) {
+      // Add to staged cards (multi-card drop!)
+      if (!stagedCards.some(c => c.id === targetCard.id)) {
+        stagedCards.push(targetCard);
+        window.soundFx.playCardDrop();
+        triggerHaptic('drop');
+        updateHandUI();
+        updateActionUI();
+        showToast(`Added another ${targetCard.rank} (${stagedCards.length}x)! Tap Deck or Discard to finish.`);
+      }
+    } else {
+      // Different rank -> Swap previous cards with this one
+      stagedCards = [targetCard];
+      window.soundFx.playCardDrop();
+      triggerHaptic('drop');
+      updateHandUI();
+      updateActionUI();
+      showToast(`Swapped to ${targetCard.rank}! Tap Left Deck or Discard to finish.`);
+    }
+  };
+
+  // Find DOM source card element
+  const sourceEl = cardEl || document.querySelector(`.hand-card[data-card-id="${cardId}"]`);
+  if (sourceEl && middleDottedDropBox) {
+    sourceEl.style.opacity = '0';
+    flyCardWipe(sourceEl, middleDottedDropBox, createCardInner(targetCard, false), {
+      cardClass: `${targetCard.color} ${targetCard.isWild ? 'wild-joker-card' : ''}`,
+      duration: 210,
+      onComplete: commitDrop
+    });
   } else {
-    // Different rank -> Swap previous cards with this one
-    stagedCards = [targetCard];
-    window.soundFx.playCardDrop();
-    updateHandUI();
-    updateActionUI();
-    showToast(`Swapped to ${targetCard.rank}! Tap Left Deck or Discard to finish.`);
+    commitDrop();
   }
 }
 
 function unstageCards() {
   if (stagedCards.length === 0) return;
+  const cardsToReturn = [...stagedCards];
   stagedCards = [];
-  window.soundFx.playCardDraw();
-  updateHandUI();
-  updateActionUI();
-  showToast('Cards returned to hand ↩️');
+  flyCardWipe(middleDottedDropBox, myHandCards, '', {
+    duration: 200,
+    onComplete: () => {
+      window.soundFx.playCardDraw();
+      updateHandUI();
+      updateActionUI();
+      showToast('Cards returned to hand ↩️');
+    }
+  });
 }
 
 function shakeDropBox() {
@@ -711,7 +898,7 @@ middleDottedDropBox.addEventListener('click', () => {
   if (stagedCards.length > 0) {
     unstageCards();
   } else {
-    showToast('Tap card(s) from your hand to drop into this box');
+    showToast('Tap or swipe up card(s) from your hand to drop here');
     shakeDropBox();
   }
 });
@@ -747,7 +934,7 @@ middleDottedDropBox.addEventListener('drop', (e) => {
 });
 
 // -----------------------------------------------------------------------------
-// CARD DRAW: DIRECT TAP ON LEFT DRAW DECK OR RIGHT DISCARD PILE
+// CARD DRAW: DIRECT TAP ON LEFT DRAW DECK OR RIGHT DISCARD PILE WITH WIPE FLIGHT
 // -----------------------------------------------------------------------------
 drawPileBtn.addEventListener('click', () => {
   if (!gameState) return;
@@ -757,15 +944,29 @@ drawPileBtn.addEventListener('click', () => {
     return;
   }
 
-  // Staged drop ready -> Commit atomic drop & draw from DECK!
+  // Staged drop ready -> Animate card draw wipe from DECK into hand!
   if (stagedCards.length > 0) {
     const dropIds = stagedCards.map(c => c.id);
     stagedCards = [];
-    socket.emit('dropAndDraw', { dropCardIds: dropIds, source: 'DECK' });
-    window.soundFx.playCardDraw();
+    flyCardWipe(drawPileBtn, myHandCards, '🂠', {
+      cardClass: 'deck-back-pattern',
+      duration: 230,
+      onComplete: () => {
+        socket.emit('dropAndDraw', { dropCardIds: dropIds, source: 'DECK' });
+        window.soundFx.playCardDraw();
+        triggerHaptic('tap');
+      }
+    });
   } else if (gameState.turnPhase === 'DRAW') {
-    socket.emit('drawCard', { source: 'DECK' });
-    window.soundFx.playCardDraw();
+    flyCardWipe(drawPileBtn, myHandCards, '🂠', {
+      cardClass: 'deck-back-pattern',
+      duration: 230,
+      onComplete: () => {
+        socket.emit('drawCard', { source: 'DECK' });
+        window.soundFx.playCardDraw();
+        triggerHaptic('tap');
+      }
+    });
   } else {
     showToast('👉 Drop your card(s) in the middle first!');
     shakeDropBox();
@@ -778,15 +979,29 @@ discardStackPile.addEventListener('click', () => {
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
   const topDiscard = gameState.topDiscard;
 
-  // Staged drop ready -> Commit atomic drop & pick PREVIOUS discard!
+  // Staged drop ready -> Commit atomic drop & animate pick from DISCARD!
   if (isMyTurn && stagedCards.length > 0) {
     const dropIds = stagedCards.map(c => c.id);
     stagedCards = [];
-    socket.emit('dropAndDraw', { dropCardIds: dropIds, source: 'DISCARD' });
-    window.soundFx.playCardDraw();
+    flyCardWipe(discardStackPile, myHandCards, topDiscard ? createCardInner(topDiscard, false) : '', {
+      cardClass: topDiscard ? `${topDiscard.color}` : '',
+      duration: 230,
+      onComplete: () => {
+        socket.emit('dropAndDraw', { dropCardIds: dropIds, source: 'DISCARD' });
+        window.soundFx.playCardDraw();
+        triggerHaptic('tap');
+      }
+    });
   } else if (isMyTurn && gameState.turnPhase === 'DRAW') {
-    socket.emit('drawCard', { source: 'DISCARD' });
-    window.soundFx.playCardDraw();
+    flyCardWipe(discardStackPile, myHandCards, topDiscard ? createCardInner(topDiscard, false) : '', {
+      cardClass: topDiscard ? `${topDiscard.color}` : '',
+      duration: 230,
+      onComplete: () => {
+        socket.emit('drawCard', { source: 'DISCARD' });
+        window.soundFx.playCardDraw();
+        triggerHaptic('tap');
+      }
+    });
   } else {
     // Check if player has matching card to slash
     if (myPlayer && topDiscard) {
@@ -1025,6 +1240,11 @@ function renderLobby(state) {
   }
 }
 
+// State tracking for smooth animations and transitions
+let lastObservedRoundNumber = null;
+let isRoundDealAnimationActive = false;
+let lastObservedActionKey = null;
+
 // 2. Render In-Game Table & Fullscreen Immersive Canvas
 function renderGameTable(state) {
   roundNumberBadge.innerText = state.roundNumber;
@@ -1037,8 +1257,38 @@ function renderGameTable(state) {
     tableCodeInHud.innerText = state.roomCode || currentRoomCode || '------';
   }
 
+  // Detect round change to trigger staggered deal wiping animation
+  if (state.roundNumber && state.roundNumber !== lastObservedRoundNumber) {
+    lastObservedRoundNumber = state.roundNumber;
+    isRoundDealAnimationActive = true;
+    if (window.soundFx && window.soundFx.playCardWhoosh) {
+      window.soundFx.playCardWhoosh();
+    }
+  }
+
+  // Detect new opponent action to trigger physical ghost flight trail across the table
   if (state.lastAction) {
     actionBanner.innerText = state.lastAction.text;
+    const actionKey = `${state.lastAction.playerId || ''}_${state.lastAction.text || ''}`;
+    if (lastObservedActionKey !== actionKey) {
+      lastObservedActionKey = actionKey;
+      const actorId = state.lastAction.playerId;
+      if (actorId && actorId !== myPlayerId) {
+        const oppEl = document.getElementById('oppSlot_' + actorId);
+        if (oppEl) {
+          const text = (state.lastAction.text || '').toLowerCase();
+          if (text.includes('dropped') || text.includes('slashed') || text.includes('played')) {
+            flyOpponentGhostCard(oppEl, middleDottedDropBox);
+          } else if (text.includes('drew') || text.includes('draw')) {
+            if (text.includes('discard')) {
+              flyOpponentGhostCard(discardStackPile, oppEl);
+            } else {
+              flyOpponentGhostCard(drawPileBtn, oppEl);
+            }
+          }
+        }
+      }
+    }
   }
 
   deckCountBadge.innerText = state.drawPileCount;
@@ -1178,6 +1428,9 @@ function renderOpponents(opponents, currentTurnPlayerId) {
       slotDiv.style.transform = 'translate(-50%, -50%)';
       slotDiv.style.flexDirection = flexDir;
     }
+
+    slotDiv.setAttribute('data-player-id', p.id);
+    slotDiv.id = 'oppSlot_' + p.id;
 
     slotDiv.innerHTML = `
       <div class="opponent-profile">
@@ -1378,13 +1631,94 @@ function updateHandUI() {
   myHandPoints.innerText = liveCount;
 
   myHandCards.innerHTML = '';
-  visibleHand.forEach(card => {
+  visibleHand.forEach((card, idx) => {
     const cardEl = document.createElement('div');
     cardEl.className = `hand-card single-card ${card.color} ${card.isWild ? 'wild-joker-card' : ''}`;
+    cardEl.setAttribute('data-card-id', card.id);
+
+    // Apply staggered wipe-in animation on round deal
+    if (isRoundDealAnimationActive) {
+      cardEl.classList.add('deal-wipe');
+      cardEl.style.animationDelay = `${idx * 70}ms`;
+    }
+
     cardEl.innerHTML = createCardInner(card, false);
 
-    // Direct tap on card in hand -> moves directly to middle drop box!
-    cardEl.addEventListener('click', () => onHandCardClick(card.id));
+    // Direct tap on card in hand -> wipes & moves directly to middle drop box!
+    cardEl.addEventListener('click', () => {
+      if (cardEl.dataset.swiped === 'true') {
+        cardEl.dataset.swiped = 'false';
+        return;
+      }
+      onHandCardClick(card.id, cardEl);
+    });
+
+    // Mobile Tactile Flick & Swipe-to-Drop Support
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+    let isTouchActive = false;
+
+    cardEl.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+      touchStartTime = Date.now();
+      isTouchActive = true;
+      cardEl.dataset.swiped = 'false';
+      cardEl.classList.add('touching');
+      touchDraggedCardId = card.id;
+    }, { passive: true });
+
+    cardEl.addEventListener('touchmove', (e) => {
+      if (!isTouchActive || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dy = t.clientY - touchStartY;
+      const dx = t.clientX - touchStartX;
+
+      if (dy < -10 && Math.abs(dy) > Math.abs(dx)) {
+        cardEl.classList.add('swiping-up');
+        cardEl.style.transform = `translateY(${Math.max(dy, -55)}px) scale(1.05)`;
+        if (middleDottedDropBox) {
+          middleDottedDropBox.classList.add('drag-over');
+        }
+      }
+    }, { passive: true });
+
+    cardEl.addEventListener('touchend', (e) => {
+      if (!isTouchActive) return;
+      isTouchActive = false;
+      cardEl.classList.remove('touching');
+      cardEl.classList.remove('swiping-up');
+      cardEl.style.transform = '';
+      if (middleDottedDropBox) {
+        middleDottedDropBox.classList.remove('drag-over');
+      }
+
+      const touch = e.changedTouches[0];
+      const dy = touch.clientY - touchStartY;
+      const dx = touch.clientX - touchStartX;
+      const dt = Date.now() - touchStartTime;
+
+      const elemUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+      const isOverDropBox = elemUnder && (elemUnder === middleDottedDropBox || middleDottedDropBox.contains(elemUnder));
+      const isUpwardFlick = dy < -32 || (dy < -18 && dt < 280 && Math.abs(dy) > Math.abs(dx));
+
+      if (isOverDropBox || isUpwardFlick) {
+        cardEl.dataset.swiped = 'true';
+        setTimeout(() => { cardEl.dataset.swiped = 'false'; }, 300);
+        onHandCardClick(card.id, cardEl);
+      } else if (elemUnder && (elemUnder === discardStackPile || discardStackPile.contains(elemUnder))) {
+        cardEl.dataset.swiped = 'true';
+        setTimeout(() => { cardEl.dataset.swiped = 'false'; }, 300);
+        const topDiscard = gameState?.topDiscard;
+        if (topDiscard && (card.rank === topDiscard.rank || (card.isWild && topDiscard.isWild))) {
+          executeSlash();
+        }
+      }
+      touchDraggedCardId = null;
+    });
 
     // Enable HTML5 Drag & Drop on your turn
     if (isDropPhase) {
@@ -1398,35 +1732,16 @@ function updateHandUI() {
         cardEl.classList.remove('dragging');
         middleDottedDropBox.classList.remove('drag-over');
       });
-
-      // Mobile Touch Drag Support
-      cardEl.addEventListener('touchstart', (e) => {
-        touchDraggedCardId = card.id;
-      }, { passive: true });
-
-      cardEl.addEventListener('touchend', (e) => {
-        if (!touchDraggedCardId) return;
-        const touch = e.changedTouches[0];
-        const elemUnder = document.elementFromPoint(touch.clientX, touch.clientY);
-
-        // Dragged into middle dashed box: stage card!
-        if (elemUnder && (elemUnder === middleDottedDropBox || middleDottedDropBox.contains(elemUnder))) {
-          onHandCardClick(touchDraggedCardId);
-        }
-        // Dragged onto discard pile: if matches top discard rank, auto-slash!
-        else if (elemUnder && (elemUnder === discardStackPile || discardStackPile.contains(elemUnder))) {
-          const topDiscard = gameState?.topDiscard;
-          const draggedCard = myPlayer.hand.find(c => c.id === touchDraggedCardId);
-          if (topDiscard && draggedCard && (draggedCard.rank === topDiscard.rank || (draggedCard.isWild && topDiscard.isWild))) {
-            executeSlash();
-          }
-        }
-        touchDraggedCardId = null;
-      });
     }
 
     myHandCards.appendChild(cardEl);
   });
+
+  if (isRoundDealAnimationActive) {
+    setTimeout(() => {
+      isRoundDealAnimationActive = false;
+    }, visibleHand.length * 70 + 400);
+  }
 }
 
 function updateActionUI() {
@@ -1579,6 +1894,8 @@ function showResultsModal(results, isGameOver) {
 
   if (results.isGoodShow) {
     window.soundFx.playGoodShow();
+    if (window.soundFx.playChipClink) window.soundFx.playChipClink();
+    launchCelebrationConfetti();
     resultsTitle.innerText = `👑 Good Show by ${results.caller.name}!`;
     resultsTitle.style.color = 'var(--gold)';
     resultsSubtitle.innerText = `${results.caller.name} had the lowest hand (${results.caller.score} pts) and scored 0!`;
@@ -1617,6 +1934,10 @@ function showResultsModal(results, isGameOver) {
   }
 
   if (isGameOver) {
+    if (results.champion && results.champion.id === myPlayerId) {
+      if (window.soundFx.playChipClink) window.soundFx.playChipClink();
+      launchCelebrationConfetti();
+    }
     resultsTitle.innerText = `🏆 GAME OVER - ${results.champion ? results.champion.name : 'Winner'} Wins!`;
     resultsSubtitle.innerText = 'The last player standing has won the table!';
     hostNextRoundContainer.style.display = 'none';

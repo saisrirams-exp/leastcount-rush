@@ -1207,7 +1207,157 @@ header.app-bar {
   position: relative;
   overflow: hidden;
   user-select: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-user-select: none;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease;
+}
+
+/* Laminated Glossy Card Shimmer Wipe */
+.single-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.35) 48%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.35) 52%, transparent 75%);
+  transform: translateX(-160%);
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 8;
+}
+
+.wild-joker-card::after,
+.wild-joker-under-card::after {
+  animation: cardShineWipe 3.5s infinite ease-in-out;
+}
+
+.single-card.shimmer::after {
+  animation: cardShineOnce 0.6s ease-out;
+}
+
+@keyframes cardShineWipe {
+  0%, 65% { transform: translateX(-160%) skewX(-15deg); }
+  100% { transform: translateX(160%) skewX(-15deg); }
+}
+
+@keyframes cardShineOnce {
+  0% { transform: translateX(-160%) skewX(-15deg); }
+  100% { transform: translateX(160%) skewX(-15deg); }
+}
+
+/* High-Performance Flying Card Wipe Animation */
+.flying-card-wipe {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  transform-origin: center center !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.45) !important;
+  will-change: transform, opacity;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform var(--fly-duration, 240ms) cubic-bezier(0.2, 0.85, 0.25, 1),
+              box-shadow var(--fly-duration, 240ms) ease,
+              opacity var(--fly-duration, 240ms) ease;
+}
+
+/* Opponent Ghost Card Travelling across the Table */
+.opponent-ghost-card {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 9998 !important;
+  width: 38px !important;
+  height: 54px !important;
+  border-radius: 5px !important;
+  background: linear-gradient(135deg, #220b3f 0%, #110323 100%) !important;
+  border: 1.5px solid #d4af37 !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--gold) !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  will-change: transform, opacity;
+  transition: transform var(--fly-duration, 320ms) cubic-bezier(0.25, 1, 0.5, 1),
+              opacity var(--fly-duration, 320ms) ease;
+}
+
+/* Hand Deal Wipe Entrance Animation */
+@keyframes dealCardWipeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-90px) scale(0.6) rotate(-14deg);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(6px) scale(1.04) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.hand-card.deal-wipe {
+  animation: dealCardWipeIn 0.36s cubic-bezier(0.2, 0.85, 0.3, 1.2) both;
+}
+
+/* Mobile Touch & Swipe Ergonomics */
+.hand-card {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.hand-card:active {
+  cursor: grabbing;
+}
+
+.hand-card.touching {
+  transform: translateY(-16px) scale(1.08) !important;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 197, 66, 0.45) !important;
+  border-color: var(--gold) !important;
+  z-index: 50 !important;
+}
+
+.hand-card.swiping-up {
+  transition: none !important;
+  z-index: 100 !important;
+  box-shadow: 0 20px 36px rgba(0, 0, 0, 0.7), 0 0 20px var(--gold) !important;
+}
+
+.middle-drop-zone.drag-over {
+  border-color: #2ecc71 !important;
+  background: rgba(46, 204, 113, 0.18) !important;
+  box-shadow: 0 0 24px rgba(46, 204, 113, 0.5) !important;
+  transform: scale(1.04) !important;
+}
+
+.interactive-pile.can-draw {
+  animation: pileDrawGlow 1.2s infinite alternate !important;
+}
+
+@keyframes pileDrawGlow {
+  0% { box-shadow: 0 0 10px rgba(245, 197, 66, 0.4), -4px 6px 16px rgba(0, 0, 0, 0.65); }
+  100% { box-shadow: 0 0 24px rgba(245, 197, 66, 0.85), -4px 6px 20px rgba(0, 0, 0, 0.8); }
+}
+
+.fan-count-badge.pulse-count {
+  animation: fanBadgeBounce 0.4s ease-out;
+}
+
+@keyframes fanBadgeBounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); background: var(--gold); color: #120320; }
+  100% { transform: scale(1); }
+}
+
+.celebration-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
 }
 
 .single-card.red,
