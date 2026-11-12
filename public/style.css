@@ -668,45 +668,45 @@ header.app-bar {
 /* 3D Gold Playing Card Corner Accents */
 .table-corner-card.corner-top-left {
   position: absolute;
-  top: -30px;
-  left: -20px;
-  width: 140px;
-  height: 200px;
+  top: -42px;
+  left: -30px;
+  width: 125px;
+  height: 180px;
   background: linear-gradient(135deg, #2b124c 0%, #1a0833 100%);
-  border: 4px solid #d4af37;
+  border: 3px solid rgba(212, 175, 55, 0.7);
   border-radius: 16px;
   transform: rotate(28deg);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), inset 0 0 20px rgba(245, 197, 66, 0.25);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), inset 0 0 20px rgba(245, 197, 66, 0.18);
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 0.42;
 }
 
 .table-corner-heart.corner-top-right {
   position: absolute;
-  top: 15px;
-  right: 25px;
-  width: 50px;
-  height: 50px;
+  top: 66px;
+  right: 16px;
+  width: 38px;
+  height: 38px;
   background: radial-gradient(circle at 35% 35%, #ffd700, #b8860b 70%, #5c4308 100%);
   clip-path: path('M25 12 C25 12 18 2 10 7 C5 11 7 18 10 22 L25 36 L40 22 C43 18 45 11 40 7 C32 2 25 12 25 12 Z');
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
-  opacity: 0.85;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.4));
+  opacity: 0.22;
   pointer-events: none;
 }
 
 .table-corner-fan.corner-bottom-right {
   position: absolute;
-  bottom: -40px;
-  right: -30px;
-  width: 160px;
-  height: 220px;
+  bottom: -55px;
+  right: -45px;
+  width: 145px;
+  height: 200px;
   background: linear-gradient(135deg, #2b124c 0%, #150529 100%);
-  border: 4px solid #d4af37;
+  border: 3px solid rgba(212, 175, 55, 0.7);
   border-radius: 16px;
   transform: rotate(-25deg);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(245, 197, 66, 0.3);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(245, 197, 66, 0.2);
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 0.42;
 }
 
 @media (max-height: 480px) and (orientation: landscape) {
@@ -1460,18 +1460,19 @@ header.app-bar {
 
 .card-wild-star-badge {
   position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 3px;
+  left: 4px;
+  transform: none;
   background: var(--gold);
   color: #120320;
-  font-size: 8px;
+  font-size: 7.5px;
   font-weight: 900;
-  padding: 1px 5px;
-  border-radius: 6px;
-  letter-spacing: 0.5px;
+  padding: 1px 4px;
+  border-radius: 5px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  z-index: 6;
 }
 
 /* =======================================================
@@ -1614,7 +1615,7 @@ header.app-bar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 110px;
+  min-width: 196px;
   margin-bottom: 12px;
   pointer-events: auto;
   flex-shrink: 0;
@@ -2912,20 +2913,20 @@ header.app-bar {
   line-height: 1;
 }
 
-/* Keep idle middle zone invisible until Your Turn or staged */
+/* Keep idle middle zone subtle yet clearly framing the center drop hub */
 .middle-drop-zone:not(.active-drop):not(.has-staged) {
-  border-color: transparent !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  border: 1.5px dashed rgba(255, 255, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.22) !important;
 }
 .middle-drop-zone:not(.active-drop):not(.has-staged) .dashed-drop-guide {
-  opacity: 0;
+  opacity: 0.35;
 }
 
-/* Top-Center "Your Turn!" Pill Banner */
+/* "Your Turn!" Pill Banner anchored cleanly above your hand tray */
 .your-turn-pill {
   position: absolute;
-  top: 44px;
+  bottom: 142px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 42;
@@ -2943,7 +2944,7 @@ header.app-bar {
 }
 
 @keyframes popTurnPill {
-  from { opacity: 0; transform: translate(-50%, -10px) scale(0.9); }
+  from { opacity: 0; transform: translate(-50%, 8px) scale(0.9); }
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
@@ -3065,12 +3066,12 @@ header.app-bar {
   filter: grayscale(1);
 }
 
-/* Empty Dashed Card Tray Slots */
+/* Empty Dashed Card Tray Slots (Matched to .single-card dimensions) */
 .hand-slot-ghost {
-  width: 66px;
-  height: 96px;
+  width: 78px;
+  height: 112px;
   border-radius: 8px;
-  border: 1.5px dashed rgba(255, 255, 255, 0.14);
+  border: 1.5px dashed rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.02);
   flex-shrink: 0;
   pointer-events: none;
@@ -3078,10 +3079,10 @@ header.app-bar {
 
 /* Auto Play Button & Emoji Reactions */
 .auto-play-btn {
-  font-size: 9.5px !important;
-  line-height: 1.05 !important;
-  padding: 4px 7px !important;
-  min-width: 44px;
+  font-size: 10.5px !important;
+  line-height: 1.1 !important;
+  padding: 4px 9px !important;
+  white-space: nowrap;
   justify-content: center;
   text-align: center;
 }
@@ -3295,6 +3296,9 @@ header.app-bar {
     height: 72px !important;
     border-radius: 6px !important;
   }
+  .player-hud-right {
+    min-width: 82px !important;
+  }
   .index-suit-svg {
     width: 9px !important;
     height: 9px !important;
@@ -3304,8 +3308,92 @@ header.app-bar {
     height: 22px !important;
   }
   .your-turn-pill {
-    top: 32px !important;
+    top: auto !important;
+    bottom: 98px !important;
     font-size: 11px !important;
     padding: 3px 12px !important;
+  }
+}
+
+/* =======================================================
+   CROWDED TABLE SEATING (8-15 PLAYERS) & DESKTOP PROPORTIONS
+   ======================================================= */
+.opponent-slot.crowd-mode {
+  gap: 4px;
+}
+.opponent-slot.crowd-mode .opponent-avatar-ring {
+  width: 40px;
+  height: 40px;
+}
+.opponent-slot.crowd-mode .opponent-avatar-emoji {
+  font-size: 20px;
+}
+.opponent-slot.crowd-mode .opponent-name-label {
+  font-size: 10.5px;
+  max-width: 66px;
+}
+.opponent-slot.crowd-mode .opponent-cards-fan {
+  width: 46px;
+  height: 38px;
+}
+.opponent-slot.crowd-mode .fan-card {
+  width: 24px;
+  height: 34px;
+}
+.opponent-slot.crowd-mode .fan-card.f1 { left: 2px; }
+.opponent-slot.crowd-mode .fan-card.f2 { left: 8px; }
+.opponent-slot.crowd-mode .fan-card.f3 { left: 14px; }
+.opponent-slot.crowd-mode .fan-count-badge {
+  width: 21px;
+  height: 21px;
+  font-size: 11px;
+  left: 9px;
+  top: 6px;
+}
+
+@media (max-width: 768px) {
+  .player-hud-right {
+    min-width: 80px;
+  }
+  .hand-slot-ghost {
+    width: 60px;
+    height: 88px;
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 600px) {
+  .center-table-hub {
+    top: 53%;
+    gap: 44px;
+  }
+  .floating-timer-wrap {
+    top: -54px;
+  }
+  .draw-pile-group {
+    width: 132px;
+    height: 134px;
+  }
+  .wild-joker-under-card,
+  .draw-deck-card,
+  .discard-pile-group,
+  .center-table-hub .single-card {
+    width: 88px !important;
+    height: 126px !important;
+  }
+  .draw-deck-card {
+    left: 40px !important;
+    top: 6px !important;
+  }
+  .middle-drop-zone {
+    width: 164px;
+    height: 126px;
+  }
+  .hand-cards-container {
+    gap: 8px;
+  }
+  .hand-cards-container .single-card,
+  .hand-cards-container .hand-slot-ghost {
+    width: 84px !important;
+    height: 120px !important;
   }
 }

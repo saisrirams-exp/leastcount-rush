@@ -621,14 +621,41 @@ export class TableUIController {
         if (total <= 5) {
           slotDiv.className = `opponent-slot compact-landscape ${slotClass} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
         } else {
-          const angle = Math.PI - (idx / (total - 1)) * Math.PI;
-          const leftPct = 50 - 44 * Math.cos(angle);
-          const topPct = 38 - 21 * Math.sin(angle);
-          slotDiv.className = `opponent-slot compact-landscape ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
+          // Balanced table perimeter zones: prevent outer left/right wing collisions up to 14 opponents
+          const sideCount = total >= 12 ? 3 : total >= 8 ? 2 : 1;
+          const topCount = total - sideCount * 2;
+          let leftPct = 50;
+          let topPct = 17;
+          let flexDir = 'row';
+          const isCrowd = total >= 8;
+
+          if (idx < sideCount) {
+            // Left wing stacked cleanly bottom-to-top toward top-left corner
+            const step = sideCount > 1 ? idx / (sideCount - 1) : 0.5;
+            leftPct = 6.5 + step * 3.0;
+            topPct = sideCount === 1 ? 44 : 56 - step * 30;
+            flexDir = 'row';
+          } else if (idx < sideCount + topCount) {
+            // Top gentle arc spread evenly across middle 64% without touching wings or top HUD
+            const topIdx = idx - sideCount;
+            const step = topCount > 1 ? topIdx / (topCount - 1) : 0.5;
+            leftPct = 18.5 + step * 63;
+            topPct = 21.5 - Math.sin(step * Math.PI) * 4.0;
+            flexDir = isCrowd ? 'column' : 'row';
+          } else {
+            // Right wing mirroring left wing top-to-bottom
+            const rightIdx = idx - (sideCount + topCount);
+            const step = sideCount > 1 ? rightIdx / (sideCount - 1) : 0.5;
+            leftPct = 90.5 + step * 3.0;
+            topPct = sideCount === 1 ? 44 : 26 + step * 30;
+            flexDir = 'row-reverse';
+          }
+
+          slotDiv.className = `opponent-slot compact-landscape ${isCrowd ? 'crowd-mode' : ''} ${isCurrentTurn ? 'active-turn' : ''} ${p.eliminated ? 'eliminated' : ''}`;
           slotDiv.style.left = `${leftPct}%`;
           slotDiv.style.top = `${topPct}%`;
           slotDiv.style.transform = 'translate(-50%, -50%)';
-          if (leftPct > 70) slotDiv.style.flexDirection = 'row-reverse';
+          slotDiv.style.flexDirection = flexDir;
         }
       } else {
         let leftPct = 50;
