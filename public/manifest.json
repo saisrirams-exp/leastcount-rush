@@ -1,0 +1,18 @@
+{
+  "name": "Least Count Rush",
+  "short_name": "Least Count",
+  "description": "High-speed 6 to 15 player multiplayer Least Count Rush card game",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#120624",
+  "theme_color": "#1c0b36",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

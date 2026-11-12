@@ -1,0 +1,30 @@
+{
+  "appId": "com.saisriram.leastcountrush",
+  "appName": "Least Count Rush",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "leastcount-rush.onrender.com",
+      "*.onrender.com"
+    ]
+  },
+  "android": {
+    "backgroundColor": "#120624",
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": false,
+      "backgroundColor": "#120624",
+      "showSpinner": true,
+      "spinnerColor": "#f5c542"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#120624"
+    }
+  }
+}

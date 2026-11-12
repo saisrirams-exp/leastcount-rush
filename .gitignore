@@ -14,3 +14,21 @@ npm-debug.log*
 .env
 .DS_Store
 Thumbs.db
+
+# Android / Capacitor Build Artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Reference media & temp local files
+*.mp4
+Screenshot_*.png
+/assets/
+/scratch/

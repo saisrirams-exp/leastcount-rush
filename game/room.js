@@ -175,10 +175,12 @@ class GameRoom {
     }
 
     this.roundNumber = 0;
+    this.roundHistory = [];
     this.players.forEach(p => {
       p.score = 0;
       p.eliminated = false;
       p.waitingNextRound = false;
+      p.autoPlay = false;
       p.hand = [];
     });
 
@@ -297,6 +299,7 @@ class GameRoom {
       type: 'DROP',
       playerId,
       playerName: currentPlayer.name,
+      cards: cardsToDrop,
       text: `${currentPlayer.name} dropped [${rankText}]`
     };
 
@@ -357,6 +360,7 @@ class GameRoom {
       type: 'SLASH',
       playerId,
       playerName: currentPlayer.name,
+      cards: cardsToSlash,
       text: `⚡ ${currentPlayer.name} SLASHED the ${targetRank}! Dropped ${cardsToSlash.length} card(s) without drawing!`
     };
 
@@ -373,6 +377,7 @@ class GameRoom {
     this.status = 'LOBBY';
     this.roundNumber = 0;
     this.roundResults = null;
+    this.roundHistory = [];
     this.drawPile = [];
     this.discardPile = [];
     this.wildJokerCard = null;
@@ -382,6 +387,7 @@ class GameRoom {
       p.score = 0;
       p.eliminated = false;
       p.waitingNextRound = false;
+      p.autoPlay = false;
       p.droppedThisTurn = [];
     });
     this.lastAction = { type: 'STOPPED', text: reason };
@@ -454,6 +460,8 @@ class GameRoom {
       type: 'PLAY',
       playerId,
       playerName: currentPlayer.name,
+      cards: cardsToDrop,
+      source,
       text: `${currentPlayer.name} dropped [${rankText}] and drew from ${source === 'DISCARD' ? 'discard pile' : 'deck'}`
     };
 
@@ -628,6 +636,7 @@ class GameRoom {
     }
 
     this.roundResults = {
+      roundNumber: this.roundNumber,
       caller: {
         id: callerEntry.player.id,
         name: callerEntry.player.name,
@@ -643,15 +652,41 @@ class GameRoom {
         handScore: s.handScore,
         roundPoints: s.roundPoints,
         totalScore: s.player.score,
-        eliminated: s.player.eliminated
+        eliminated: s.player.eliminated,
+        showed: s.player.id === playerId,
+        isPenalty: s.player.id === penaltyPlayerId,
+        isWinner: roundWinner ? s.player.id === roundWinner.id : false
       })),
       newlyEliminated: newlyEliminated.map(p => ({ id: p.id, name: p.name, score: p.score })),
       gameOver,
       champion: champion ? { id: champion.id, name: champion.name } : null
     };
 
+    this.roundHistory = this.roundHistory || [];
+    this.roundHistory.push({
+      roundNumber: this.roundNumber,
+      callerId: callerEntry.player.id,
+      penaltyPlayerId,
+      winnerId: roundWinner ? roundWinner.id : null,
+      scoresByPlayerId: Object.fromEntries(
+        scores.map(s => [
+          s.player.id,
+          {
+            handScore: s.handScore,
+            roundPoints: s.roundPoints,
+            totalScore: s.player.score,
+            showed: s.player.id === playerId,
+            isPenalty: s.player.id === penaltyPlayerId,
+            isWinner: roundWinner ? s.player.id === roundWinner.id : false
+          }
+        ])
+      )
+    });
+
     this.lastAction = {
       type: 'SHOW',
+      playerId,
+      playerName: callerEntry.player.name,
       isGoodShow,
       callerName: callerEntry.player.name,
       text: `${callerEntry.player.name} called SHOW! (${isGoodShow ? 'Good Show! 0 pts' : 'Bad Show! +40 Penalty'})`
@@ -690,11 +725,18 @@ class GameRoom {
     }
 
     if (this.turnPhase === 'DROP') {
-      // Find highest point card(s) and drop
-      const sortedHand = [...player.hand].sort((a, b) => (b.points || 0) - (a.points || 0));
-      const cardToDrop = sortedHand[0];
-      if (cardToDrop) {
-        this.handleDropAndDraw(player.id, [cardToDrop.id], 'DECK');
+      const move = this.decideBotMove(player);
+      if (move?.action === 'SHOW') {
+        this.handleCallShow(player.id);
+        return;
+      }
+      if (move?.action === 'SLASH') {
+        this.handleSlash(player.id, move.cardIds);
+        return;
+      }
+      const ids = move?.cardIds || (player.hand[0] ? [player.hand[0].id] : []);
+      if (ids.length > 0) {
+        this.handleDropAndDraw(player.id, ids, 'DECK');
       } else {
         this.advanceTurn();
       }
@@ -718,6 +760,18 @@ class GameRoom {
       const shouldShow = handScore <= 6 || (handScore <= 8 && Math.random() < 0.6);
       if (shouldShow) {
         return { action: 'SHOW' };
+      }
+
+      // 1b. Opportunistic SLASH if topDiscard matches card(s) worth discarding without drawing
+      const topDiscard = this.discardPile[this.discardPile.length - 1];
+      if (topDiscard && botPlayer.hand.length > 1) {
+        const slashMatches = botPlayer.hand.filter(
+          c => c.rank === topDiscard.rank || (c.isWild && topDiscard.isWild)
+        );
+        const slashPoints = slashMatches.reduce((sum, c) => sum + (c.points || 0), 0);
+        if (slashMatches.length > 0 && slashPoints >= 3) {
+          return { action: 'SLASH', cardIds: slashMatches.map(c => c.id) };
+        }
       }
 
       // 2. Decide what to drop:
@@ -797,6 +851,7 @@ class GameRoom {
       turnTimeRemaining: this.turnTimeRemaining,
       lastAction: this.lastAction,
       roundResults: this.roundResults,
+      roundHistory: this.roundHistory || [],
       players: this.players.map(p => ({
         id: p.id,
         name: p.name,
@@ -805,6 +860,7 @@ class GameRoom {
         score: p.score,
         connected: p.connected !== false,
         waitingNextRound: p.waitingNextRound || false,
+        autoPlay: Boolean(p.autoPlay),
         cardCount: p.hand.length,
         eliminated: p.eliminated,
         // Only reveal the actual cards if it's the requested player or round is over

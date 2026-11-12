@@ -79,3 +79,42 @@ Your friends do **not** need to be on the same Wi-Fi. You can share your game wi
    ```
 3. Cloudflare will give you an instant `https://....trycloudflare.com` link.
 4. Send that link to your friends—they can play on mobile data (4G/5G) or any home Wi-Fi with zero setup!
+
+---
+
+## 🏗️ Modular Architecture (Vanilla HTML5 / CSS3 / ES6+ Modules)
+
+The frontend is cleanly organized without heavy runtime frameworks:
+
+* `public/js/config.js` — Environment routing (auto-connects native APKs to the live cloud multiplayer server)
+* `public/js/state.js` — Client state & identity persistence
+* `public/js/cards.js` — Card scoring, ascending sorter, and royal SVG card art
+* `public/js/animations.js` — 60fps GPU wipe flight transitions, opponent trails & confetti physics
+* `public/js/sound.js` — Procedural Web Audio API synthesizer with persistent mute state
+* `public/js/native-bridge.js` — Capacitor Android native plugins (Haptics, ScreenOrientation, Share Sheet, Back Button, Deep Links, SplashScreen, StatusBar)
+* `public/js/ui.js` — Table renderer, perimeter arc layout, touch upward flick-to-drop & drag controller
+* `public/js/main.js` — App bootstrap & Socket.IO event wiring
+
+---
+
+## 📱 Building Android APK / Play Store AAB (Capacitor + Android Studio)
+
+This project includes a native Android Gradle project configured for horizontal landscape play (`android/`).
+
+### Sync Web Changes to Android
+```bash
+npm run mobile:sync
+```
+
+### Build a Debug APK
+```bash
+npm run mobile:apk
+```
+The compiled APK will be generated at:
+`android/app/build/outputs/apk/debug/app-debug.apk`
+
+### Open in Android Studio (For Play Store Signed `.aab`)
+```bash
+npm run mobile:open
+```
+In Android Studio: **Build > Generate Signed App Bundle / APK > Android App Bundle** to export the `.aab` for Google Play Console.

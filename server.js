@@ -18,6 +18,16 @@ const PORT = process.env.PORT || 3000;
 // Serve static assets
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Lightweight Health & Mobile Connectivity Endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'leastcount-rush',
+    activeRooms: rooms.size,
+    uptimeSeconds: Math.floor(process.uptime())
+  });
+});
+
 // In-memory room store
 const rooms = new Map(); // roomCode -> GameRoom
 const playerRoomMap = new Map(); // socketId -> roomCode
@@ -54,17 +64,22 @@ setInterval(() => {
       const currentPlayer = room.getCurrentPlayer();
       if (!currentPlayer) continue;
 
-      // Handle Bot Turn
-      if (currentPlayer.isBot) {
+      // Handle Bot Turn or Human Auto-Play
+      if (currentPlayer.isBot || currentPlayer.autoPlay) {
         if (!room.botMoving) {
           room.botMoving = true;
           setTimeout(() => {
             try {
-              if (room.status === 'PLAYING' && room.getCurrentPlayer()?.id === currentPlayer.id) {
+              const livePlayer = room.getCurrentPlayer();
+              if (room.status === 'PLAYING' && livePlayer?.id === currentPlayer.id && (livePlayer.isBot || livePlayer.autoPlay)) {
                 const move = room.decideBotMove(currentPlayer);
                 if (move) {
                   if (move.action === 'SHOW') {
                     room.handleCallShow(currentPlayer.id);
+                    broadcastRoomState(room);
+                    room.botMoving = false;
+                  } else if (move.action === 'SLASH') {
+                    room.handleSlash(currentPlayer.id, move.cardIds);
                     broadcastRoomState(room);
                     room.botMoving = false;
                   } else if (move.action === 'DROP') {
@@ -144,6 +159,30 @@ io.on('connection', (socket) => {
       state: room.getClientState(pId)
     });
     console.log(`[Room ${code}] Created by ${playerName} (${pId}) (Max ${room.maxPlayers} players)`);
+  });
+
+  // 1-TAP QUICK PLAY VS BOTS
+  socket.on('quickPlayBots', ({ playerId, playerName, avatar, settings }) => {
+    const pId = playerId || socket.id;
+    const code = generateRoomCode();
+    const botSettings = { maxPlayers: 6, eliminationScore: 200, turnDuration: 25, faceCardScoring: 'STANDARD_10', ...(settings || {}) };
+    const room = new GameRoom(code, pId, playerName, botSettings, avatar);
+    room.players[0].socketId = socket.id;
+    room.fillWithBots();
+    room.startNewGame();
+
+    rooms.set(code, room);
+    playerRoomMap.set(socket.id, code);
+    socketPlayerMap.set(socket.id, pId);
+    socket.join(code);
+
+    socket.emit('roomJoined', {
+      success: true,
+      roomCode: code,
+      playerId: pId,
+      state: room.getClientState(pId)
+    });
+    console.log(`[Room ${code}] Quick Play vs Bots started by ${playerName} (${pId})`);
   });
 
   // JOIN ROOM
@@ -333,6 +372,28 @@ io.on('connection', (socket) => {
     room.stopGame('Game was stopped by the table admin.');
     broadcastRoomState(room);
     console.log(`[Room ${code}] Game stopped by admin ${pId}`);
+  });
+
+  // TOGGLE AUTO PLAY
+  socket.on('toggleAutoPlay', (enabled) => {
+    const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id) || socket.id;
+    const room = rooms.get(code);
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === pId);
+    if (!player) return;
+    player.autoPlay = typeof enabled === 'boolean' ? enabled : !player.autoPlay;
+    broadcastRoomState(room);
+  });
+
+  // EMOJI REACTION
+  const ALLOWED_EMOJIS = new Set(['😄', '😂', '😎', '😱', '😭', '😡', '👍', '👏', '🔥', '🙏', '🃏']);
+  socket.on('sendEmoji', ({ emoji }) => {
+    const code = playerRoomMap.get(socket.id);
+    const pId = socketPlayerMap.get(socket.id) || socket.id;
+    if (!code || !ALLOWED_EMOJIS.has(emoji)) return;
+    io.to(code).emit('playerEmoji', { playerId: pId, emoji });
   });
 
   // LEAVE ROOM / EXIT OPTION

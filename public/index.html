@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#0d3b2e">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#120624">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
   <title>Least Count Rush (6 to 15 Players)</title>
   <link rel="stylesheet" href="style.css">
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="vendor/socket.io.min.js"></script>
 </head>
 <body>
 
@@ -85,8 +88,10 @@
 
         <!-- Standard Create / Join Block -->
         <div id="standardBlock">
+          <button id="quickPlayBotsBtn" class="btn-primary quick-bot-btn" style="margin-bottom: 14px; font-size: 16px;">🤖 Play with BOT (Instant Table)</button>
+
           <div style="background: rgba(255,255,255,0.04); border: 1.5px solid rgba(245,197,66,0.3); border-radius: 14px; padding: 14px; margin-bottom: 14px;">
-            <label style="font-size: 13px; font-weight: 700; color: var(--gold); display: block; margin-bottom: 6px;">Join Friends' Table</label>
+            <label style="font-size: 13px; font-weight: 700; color: var(--gold); display: block; margin-bottom: 6px;">Play with Friends</label>
             <div class="form-group" style="margin-bottom: 8px;">
               <input type="text" id="joinCodeInput" class="text-input" placeholder="Enter 5-letter Room Code" style="text-transform:uppercase; text-align:center; letter-spacing:2.5px; font-size: 18px; font-weight: 800;">
             </div>
@@ -94,7 +99,7 @@
           </div>
 
           <div class="divider">
-            <span>or host a table</span>
+            <span>or create custom table</span>
           </div>
 
           <button id="openCreateModalBtn" class="btn-secondary" style="border: 1.5px solid var(--gold); color: var(--gold); font-size: 14px;">👑 Host New Table (6–15 Players)</button>
@@ -182,7 +187,15 @@
           <div class="hud-table-code-pill">
             <span id="tableCodeInHud">------</span>
           </div>
+          <button id="hudScoreboardBtn" class="hud-menu-btn" title="Round-by-Round Scoreboard">📊</button>
         </div>
+      </div>
+
+      <!-- Your Turn & Outcome Callout Overlays -->
+      <div id="yourTurnBanner" class="your-turn-pill" style="display:none;">⭐ Your Turn! ⭐</div>
+      <div id="outcomeCallout" class="outcome-callout" style="display:none;">
+        <div id="outcomeCalloutEmoji" class="outcome-callout-emoji">👑</div>
+        <div id="outcomeCalloutText" class="outcome-callout-text">You Won!</div>
       </div>
 
       <!-- Orientation Helper Pill for Mobile Portrait -->
@@ -240,26 +253,52 @@
 
       <!-- Bottom Bar: Player HUD (Left) | Hand Cards (Center) | Show/Slash Action (Right) -->
       <div class="table-bottom-bar">
-        <!-- Player HUD: Avatar, Count Pill, Sort Button -->
+        <!-- Player HUD: Avatar, Hearts, Timer, Count Pill, Sort & Auto Play -->
         <div class="player-hud-left">
-          <div class="hud-avatar-box">
-            <div id="myPlayerAvatar" class="hud-avatar-circle">👑</div>
+          <div class="hud-avatar-box" id="myAvatarBox">
+            <div id="myTurnRing" class="my-avatar-ring">
+              <span id="myTurnTimerBadge" class="turn-seconds-pill" style="display:none;">25s</span>
+              <div id="myPlayerAvatar" class="hud-avatar-circle">👑</div>
+            </div>
             <span class="hud-you-label">You</span>
           </div>
           <div class="hud-controls-box">
-            <div class="hud-count-capsule">
-              <span class="count-title">Count</span>
-              <span id="myHandPoints" class="count-val">0</span>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button id="emojiPickerToggleBtn" class="hud-emoji-trigger" title="Send Reaction Emoji">😀</button>
+              <div class="hud-count-capsule">
+                <span class="count-title">Count</span>
+                <span id="myHandPoints" class="count-val">0</span>
+              </div>
             </div>
-            <button id="sortCardsBtn" class="hud-action-mini-btn" title="Sort Hand Ascending (A ➔ K)">
-              <span style="font-size:14px; line-height:1;">≡</span> Sort
-            </button>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button id="autoPlayBtn" class="hud-action-mini-btn auto-play-btn" title="Toggle Auto Play">Auto<br>Play</button>
+              <button id="sortCardsBtn" class="hud-action-mini-btn" title="Sort Hand Ascending (A ➔ K)">
+                <span style="font-size:13px; line-height:1;">≡</span> Sort
+              </button>
+            </div>
+          </div>
+          <!-- Floating Emoji Picker Popover -->
+          <div id="emojiPickerPopup" class="emoji-picker-popup" style="display:none;">
+            <span class="emoji-opt" data-emoji="😄">😄</span>
+            <span class="emoji-opt" data-emoji="😂">😂</span>
+            <span class="emoji-opt" data-emoji="😎">😎</span>
+            <span class="emoji-opt" data-emoji="😱">😱</span>
+            <span class="emoji-opt" data-emoji="😭">😭</span>
+            <span class="emoji-opt" data-emoji="😡">😡</span>
+            <span class="emoji-opt" data-emoji="👍">👍</span>
+            <span class="emoji-opt" data-emoji="👏">👏</span>
+            <span class="emoji-opt" data-emoji="🔥">🔥</span>
+            <span class="emoji-opt" data-emoji="🙏">🙏</span>
           </div>
         </div>
 
-        <!-- Center Player Hand Cards -->
+        <!-- Center Player Hand Cards (or Eliminated Exit Bar) -->
         <div id="myHandCards" class="hand-cards-container">
           <!-- Standard playing cards rendered here -->
+        </div>
+        <div id="eliminatedSpectatorBar" class="eliminated-spectator-bar" style="display:none;">
+          <span class="eliminated-pill-badge">ELIMINATED</span>
+          <button id="spectatorExitBtn" class="btn-spectator-exit">Exit Table</button>
         </div>
 
         <!-- Right: Unified Glassmorphic Action Button (Show or Slash) -->
@@ -296,6 +335,7 @@
       </div>
 
       <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <button id="menuMuteSoundBtn" class="btn-secondary" style="padding:12px; font-size:14px;">🔊 Sound Effects: ON</button>
         <button id="menuCopyLinkBtn" class="btn-secondary" style="padding:12px; font-size:14px;">📋 Copy Table Invite Link</button>
         <button id="menuRulesBtn" class="btn-secondary" style="padding:12px; font-size:14px;">📖 How to Play & Rules</button>
         <button id="menuAdminStopBtn" class="btn-secondary" style="display:none; padding:12px; font-size:14px; color:var(--danger); border-color:var(--danger);">🛑 End Game for All (Admin)</button>
@@ -304,8 +344,6 @@
       </div>
     </div>
   </div>
-
-  </main>
 
   <!-- CREATE TABLE MODAL (With 6 to 15 Player Selector) -->
   <div id="createTableModal" class="modal-overlay" style="display:none;">
@@ -426,34 +464,72 @@
 
   <!-- ROUND OVER / SHOW RESULTS MODAL -->
   <div id="resultsModal" class="modal-overlay" style="display:none;">
-    <div class="modal-content">
+    <div class="modal-content results-scoreboard-glass">
       <div class="modal-header">
         <h2 id="resultsTitle">Round Results</h2>
-        <p id="resultsSubtitle" style="font-size:14px; margin-top:6px;"></p>
+        <p id="resultsSubtitle" style="font-size:13px; margin-top:4px;"></p>
       </div>
 
-      <table class="results-table">
-        <thead>
-          <tr>
-            <th>Player</th>
-            <th>Cards</th>
-            <th>Hand Pts</th>
-            <th>Round</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody id="resultsTableBody">
-          <!-- Populated dynamically -->
-        </tbody>
-      </table>
-
-      <div id="eliminatedNotice" style="margin:12px 0; color:var(--danger); font-size:13px; text-align:center; font-weight:700;"></div>
-
-      <div id="hostNextRoundContainer" style="display:none; margin-top:20px;">
-        <button id="nextRoundBtn" class="btn-primary">Start Next Round ➔</button>
+      <div class="results-scroll-wrap">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Player Name</th>
+              <th>In Hand Cards</th>
+              <th>Count</th>
+              <th>Score</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="resultsTableBody">
+            <!-- Populated dynamically with visual mini cards -->
+          </tbody>
+        </table>
       </div>
-      <div id="nonHostNextRoundMessage" style="text-align:center; color:rgba(253,250,243,0.7); font-size:13px; margin-top:16px;">
-        Waiting for host to start next round…
+
+      <div id="eliminatedNotice" style="margin:10px 0 4px 0; color:#ff6b6b; font-size:13px; text-align:center; font-weight:700;"></div>
+
+      <div class="results-footer-actions">
+        <button id="openScoreMatrixFromResultsBtn" class="btn-secondary results-matrix-btn">📊 Score Board</button>
+        <div id="hostNextRoundContainer" style="display:none;">
+          <button id="nextRoundBtn" class="btn-primary">Next Round ➔</button>
+        </div>
+        <button id="closeResultsSpectateBtn" class="btn-secondary results-spectate-btn" style="display:none;">👁️ Watch Table</button>
+      </div>
+      <div id="nonHostNextRoundMessage" style="text-align:center; color:rgba(253,250,243,0.75); font-size:12.5px; margin-top:8px;">
+        ⏳ Waiting for host to start next round…
+      </div>
+    </div>
+  </div>
+
+  <!-- CUMULATIVE ROUND-BY-ROUND SCOREBOARD MATRIX MODAL -->
+  <div id="scoreMatrixModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content score-matrix-glass">
+      <div class="score-matrix-top-row">
+        <span id="matrixRoundTitle" class="matrix-round-title">Round 1</span>
+        <span id="matrixScoreLimit" class="matrix-limit-title">Score Limit: 150</span>
+      </div>
+      <div class="score-matrix-scroll">
+        <table class="score-matrix-table">
+          <thead id="scoreMatrixHead"></thead>
+          <tbody id="scoreMatrixBody"></tbody>
+          <tfoot id="scoreMatrixFoot"></tfoot>
+        </table>
+      </div>
+      <div style="text-align:center; margin-top:12px;">
+        <button id="closeScoreMatrixBtn" class="btn-secondary" style="min-width:130px; padding:8px 20px;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NATIVE-STYLE IN-GAME CONFIRMATION MODAL -->
+  <div id="confirmDialogModal" class="modal-overlay" style="display:none; z-index:10050;">
+    <div class="modal-content" style="max-width:340px; text-align:center;">
+      <h3 id="confirmDialogTitle" style="color:var(--gold); margin-bottom:8px;">Confirm Action</h3>
+      <p id="confirmDialogMessage" style="font-size:13.5px; color:rgba(255,255,255,0.88); line-height:1.45; margin-bottom:16px;"></p>
+      <div style="display:flex; gap:10px;">
+        <button id="confirmDialogCancelBtn" class="btn-secondary" style="flex:1;">Cancel</button>
+        <button id="confirmDialogOkBtn" class="btn-primary" style="flex:1;">Confirm</button>
       </div>
     </div>
   </div>
@@ -461,7 +537,6 @@
   <!-- Floating Game Toast for Non-Blocking Mobile Feedback -->
   <div id="gameToast" class="game-toast" style="display:none;"></div>
 
-  <script src="sound.js"></script>
-  <script src="game.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
